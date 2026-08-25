@@ -7,6 +7,7 @@ import {
   Delete,
   DocumentCopy,
   Hide,
+  Printer,
   RefreshLeft,
   RefreshRight,
   Right,
@@ -203,7 +204,9 @@ const markupDrawLineWeight = ref<AcGiLineWeight>(getMarkupLineWeight())
 const markupDrawFontSize = ref(getMarkupFontSize())
 const measurementDrawColor = shallowRef(new AcCmColor())
 const measurementDrawColorDisplay = ref('#7b8794')
-const measurementDrawLineWeight = ref<AcGiLineWeight>(acapGetMeasurementLineWeight())
+const measurementDrawLineWeight = ref<AcGiLineWeight>(
+  acapGetMeasurementLineWeight()
+)
 const measurementDrawFontSize = ref(acapGetMeasurementFontSize())
 const measurementLunits = ref(AcDbLinearUnits.Decimal)
 const measurementLuprec = ref(4)
@@ -604,7 +607,8 @@ const activateRibbonTabForOverlaySelection = () => {
 
   if (kind === 'measurement') {
     const measurementId = getSelectedMeasurementId()
-    const measurementNewlySelected = measurementId !== lastActivatedMeasurementId
+    const measurementNewlySelected =
+      measurementId !== lastActivatedMeasurementId
     lastActivatedMeasurementId = measurementId
     if (measurementNewlySelected) {
       activeRibbonTabId.value = 'measurement'
@@ -777,9 +781,7 @@ const handleRibbonLineWeightChange = (value: AcGiLineWeight) => {
  */
 const syncMarkupStyleControls = () => {
   const store = getMarkupStore()
-  const selected = store.selectedId
-    ? store.get(store.selectedId)
-    : undefined
+  const selected = store.selectedId ? store.get(store.selectedId) : undefined
   if (selected) {
     const color = cssToMarkupColor(selected.style.color)
     markupDrawColor.value = color
@@ -883,7 +885,9 @@ const handleMeasurementDrawFontSizeChange = (value: number) => {
   measurementDrawFontSize.value = acapGetMeasurementFontSize()
   const view = AcApDocManager.instance?.curView as AcTrView2d | undefined
   if (view) {
-    applyMeasurementStyleToSelection(view, { fontSize: acapGetMeasurementFontSize() })
+    applyMeasurementStyleToSelection(view, {
+      fontSize: acapGetMeasurementFontSize()
+    })
   }
 }
 
@@ -2556,6 +2560,11 @@ const runLazyCommand = async (command: string) => {
   AcApDocManager.instance.sendStringToExecute(command)
 }
 
+const handleHeaderPlot = () => {
+  if (isRibbonDisabled.value) return
+  AcApDocManager.instance.sendStringToExecute('plot')
+}
+
 const handleHeaderUndo = () => {
   if (isRibbonDisabled.value || !canUndo.value) return
   AcApDocManager.instance.sendStringToExecute('undo')
@@ -2615,6 +2624,18 @@ const handleFileMenuSelect = async (command: string) => {
     >
       <template #tabs-after="{ disabled }">
         <div class="ml-ribbon-tabs-after">
+          <el-tooltip
+            :content="t('dialog.plotDlg.title')"
+            :hide-after="0"
+            :show-after="1000"
+          >
+            <el-button
+              class="ml-ribbon-tabs-after__button"
+              :disabled="disabled"
+              :icon="Printer"
+              @click="handleHeaderPlot"
+            />
+          </el-tooltip>
           <el-tooltip
             :content="t('main.ribbon.tooltip.undo')"
             :hide-after="0"

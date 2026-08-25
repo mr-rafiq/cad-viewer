@@ -2,150 +2,235 @@
   <ml-base-dialog
     v-model:modelValue="visible"
     :title="t('dialog.plotDlg.title')"
-    :width="880"
+    :width="960"
     :auto-close="false"
     @open="handleOpen"
     @ok="handleOk"
   >
     <div class="ml-plot-dlg">
-      <div class="ml-plot-dlg__settings">
-        <div class="ml-plot-dlg__row">
-          <label class="ml-plot-dlg__label">{{
-            t('dialog.plotDlg.layout')
-          }}</label>
-          <el-select
-            v-model="form.layoutName"
-            class="ml-plot-dlg__control"
-            @change="handleLayoutChanged"
+      <!-- Left column: page setup / device / paper / area / offset / scale -->
+      <div class="ml-plot-dlg__col">
+        <fieldset class="ml-plot-dlg__group">
+          <legend>{{ t('dialog.plotDlg.pageSetupGroup') }}</legend>
+          <div class="ml-plot-dlg__row">
+            <label class="ml-plot-dlg__label">{{
+              t('dialog.plotDlg.layout')
+            }}</label>
+            <el-select
+              v-model="form.layoutName"
+              class="ml-plot-dlg__control"
+              size="small"
+              @change="handleLayoutChanged"
+            >
+              <el-option :label="t('dialog.plotDlg.model')" value="" />
+              <el-option
+                v-for="layout in layouts"
+                :key="layout.name"
+                :label="layout.name"
+                :value="layout.name"
+              />
+            </el-select>
+          </div>
+        </fieldset>
+
+        <fieldset class="ml-plot-dlg__group">
+          <legend>{{ t('dialog.plotDlg.printerGroup') }}</legend>
+          <div class="ml-plot-dlg__row">
+            <label class="ml-plot-dlg__label">{{
+              t('dialog.plotDlg.deviceLabel')
+            }}</label>
+            <el-input
+              class="ml-plot-dlg__control"
+              size="small"
+              :model-value="t('dialog.plotDlg.devicePdf')"
+              readonly
+            />
+          </div>
+          <div class="ml-plot-dlg__hint">
+            {{ t('dialog.plotDlg.deviceHint') }}
+          </div>
+        </fieldset>
+
+        <fieldset class="ml-plot-dlg__group">
+          <legend>{{ t('dialog.plotDlg.paperGroup') }}</legend>
+          <div class="ml-plot-dlg__row">
+            <label class="ml-plot-dlg__label">{{
+              t('dialog.plotDlg.paperSize')
+            }}</label>
+            <el-select
+              v-model="form.paperSizeKey"
+              class="ml-plot-dlg__control"
+              size="small"
+            >
+              <el-option
+                v-for="size in paperSizes"
+                :key="size.key"
+                :label="size.label"
+                :value="size.key"
+              />
+              <el-option
+                v-if="form.layoutName"
+                :label="t('dialog.plotDlg.paperFromLayout')"
+                :value="fromLayoutPaperKey"
+              />
+              <el-option
+                :label="t('dialog.plotDlg.paperCustom')"
+                :value="customPaperKey"
+              />
+            </el-select>
+          </div>
+
+          <div
+            v-if="form.paperSizeKey === customPaperKey"
+            class="ml-plot-dlg__row"
           >
-            <el-option :label="t('dialog.plotDlg.model')" value="" />
-            <el-option
-              v-for="layout in layouts"
-              :key="layout.name"
-              :label="layout.name"
-              :value="layout.name"
+            <label class="ml-plot-dlg__label">{{
+              t('dialog.plotDlg.customSize')
+            }}</label>
+            <el-input-number
+              v-model="form.customPaperWidth"
+              :min="10"
+              :max="5000"
+              :controls="false"
+              size="small"
+              class="ml-plot-dlg__number"
             />
-          </el-select>
-        </div>
-
-        <div class="ml-plot-dlg__row">
-          <label class="ml-plot-dlg__label">{{
-            t('dialog.plotDlg.paperSize')
-          }}</label>
-          <el-select v-model="form.paperSizeKey" class="ml-plot-dlg__control">
-            <el-option
-              v-for="size in paperSizes"
-              :key="size.key"
-              :label="size.label"
-              :value="size.key"
+            <span class="ml-plot-dlg__x">{{
+              t('dialog.plotDlg.timesSign')
+            }}</span>
+            <el-input-number
+              v-model="form.customPaperHeight"
+              :min="10"
+              :max="5000"
+              :controls="false"
+              size="small"
+              class="ml-plot-dlg__number"
             />
-            <el-option
-              v-if="form.layoutName"
-              :label="t('dialog.plotDlg.paperFromLayout')"
-              :value="fromLayoutPaperKey"
+            <span class="ml-plot-dlg__unit">{{
+              t('dialog.plotDlg.unitMm')
+            }}</span>
+          </div>
+
+          <div class="ml-plot-dlg__row">
+            <label class="ml-plot-dlg__label">{{
+              t('dialog.plotDlg.margins')
+            }}</label>
+            <el-input-number
+              v-model="form.marginMm"
+              :min="0"
+              :max="100"
+              :controls="false"
+              size="small"
+              class="ml-plot-dlg__number"
             />
-            <el-option
-              :label="t('dialog.plotDlg.paperCustom')"
-              :value="customPaperKey"
+            <span class="ml-plot-dlg__unit">{{
+              t('dialog.plotDlg.unitMm')
+            }}</span>
+          </div>
+        </fieldset>
+
+        <fieldset class="ml-plot-dlg__group">
+          <legend>{{ t('dialog.plotDlg.plotAreaGroup') }}</legend>
+          <div class="ml-plot-dlg__row">
+            <label class="ml-plot-dlg__label">{{
+              t('dialog.plotDlg.plotArea')
+            }}</label>
+            <el-select
+              v-model="form.plotArea"
+              class="ml-plot-dlg__control"
+              size="small"
+            >
+              <el-option
+                :label="t('dialog.plotDlg.areaExtents')"
+                value="extents"
+              />
+              <el-option
+                :label="t('dialog.plotDlg.areaWindow')"
+                value="window"
+              />
+              <el-option
+                v-if="form.layoutName"
+                :label="t('dialog.plotDlg.areaLayout')"
+                value="layout"
+              />
+            </el-select>
+          </div>
+
+          <div v-if="form.plotArea === 'window'" class="ml-plot-dlg__row">
+            <label class="ml-plot-dlg__label">{{
+              t('dialog.plotDlg.windowLabel')
+            }}</label>
+            <span v-if="windowText" class="ml-plot-dlg__window-value">{{
+              windowText
+            }}</span>
+            <span v-else class="ml-plot-dlg__preview-empty">{{
+              t('dialog.plotDlg.windowNotSet')
+            }}</span>
+            <el-button size="small" :disabled="busy" @click="pickWindow">
+              {{ t('dialog.plotDlg.windowPick') }}
+            </el-button>
+          </div>
+        </fieldset>
+
+        <fieldset class="ml-plot-dlg__group">
+          <legend>{{ t('dialog.plotDlg.offsetGroup') }}</legend>
+          <div class="ml-plot-dlg__row">
+            <el-checkbox v-model="form.centerPlot">{{
+              t('dialog.plotDlg.centerPlot')
+            }}</el-checkbox>
+          </div>
+          <div class="ml-plot-dlg__row">
+            <label class="ml-plot-dlg__label">{{
+              t('dialog.plotDlg.offsetX')
+            }}</label>
+            <el-input-number
+              v-model="form.plotOffsetX"
+              :min="-5000"
+              :max="5000"
+              :controls="false"
+              :disabled="form.centerPlot"
+              size="small"
+              class="ml-plot-dlg__number"
             />
-          </el-select>
-        </div>
+            <span class="ml-plot-dlg__unit">{{
+              t('dialog.plotDlg.unitMm')
+            }}</span>
+            <label class="ml-plot-dlg__label ml-plot-dlg__label--inline">{{
+              t('dialog.plotDlg.offsetY')
+            }}</label>
+            <el-input-number
+              v-model="form.plotOffsetY"
+              :min="-5000"
+              :max="5000"
+              :controls="false"
+              :disabled="form.centerPlot"
+              size="small"
+              class="ml-plot-dlg__number"
+            />
+            <span class="ml-plot-dlg__unit">{{
+              t('dialog.plotDlg.unitMm')
+            }}</span>
+          </div>
+        </fieldset>
 
-        <div
-          v-if="form.paperSizeKey === customPaperKey"
-          class="ml-plot-dlg__row"
-        >
-          <label class="ml-plot-dlg__label">{{
-            t('dialog.plotDlg.customSize')
-          }}</label>
-          <el-input-number
-            v-model="form.customPaperWidth"
-            :min="10"
-            :max="5000"
-            :controls="false"
-            class="ml-plot-dlg__number"
-          />
-          <span class="ml-plot-dlg__x">{{
-            t('dialog.plotDlg.timesSign')
-          }}</span>
-          <el-input-number
-            v-model="form.customPaperHeight"
-            :min="10"
-            :max="5000"
-            :controls="false"
-            class="ml-plot-dlg__number"
-          />
-          <span class="ml-plot-dlg__unit">{{
-            t('dialog.plotDlg.unitMm')
-          }}</span>
-        </div>
-
-        <div class="ml-plot-dlg__row">
-          <label class="ml-plot-dlg__label">{{
-            t('dialog.plotDlg.orientation')
-          }}</label>
-          <el-radio-group v-model="form.orientation">
-            <el-radio value="portrait">{{
-              t('dialog.plotDlg.portrait')
-            }}</el-radio>
-            <el-radio value="landscape">{{
-              t('dialog.plotDlg.landscape')
-            }}</el-radio>
-          </el-radio-group>
-        </div>
-
-        <div class="ml-plot-dlg__row">
-          <label class="ml-plot-dlg__label">{{
-            t('dialog.plotDlg.plotArea')
-          }}</label>
-          <el-radio-group v-model="form.plotArea">
-            <el-radio value="extents">{{
-              t('dialog.plotDlg.areaExtents')
-            }}</el-radio>
-            <el-radio value="window">{{
-              t('dialog.plotDlg.areaWindow')
-            }}</el-radio>
-            <el-radio v-if="form.layoutName" value="layout">{{
-              t('dialog.plotDlg.areaLayout')
-            }}</el-radio>
-          </el-radio-group>
-        </div>
-
-        <div v-if="form.plotArea === 'window'" class="ml-plot-dlg__row">
-          <label class="ml-plot-dlg__label">{{
-            t('dialog.plotDlg.windowLabel')
-          }}</label>
-          <span v-if="windowText" class="ml-plot-dlg__window-value">{{
-            windowText
-          }}</span>
-          <span v-else class="ml-plot-dlg__preview-empty">{{
-            t('dialog.plotDlg.windowNotSet')
-          }}</span>
-          <el-button
-            size="small"
-            :disabled="busy"
-            @click="pickWindow"
-          >
-            {{ t('dialog.plotDlg.windowPick') }}
-          </el-button>
-        </div>
-
-        <div class="ml-plot-dlg__row">
-          <label class="ml-plot-dlg__label">{{
-            t('dialog.plotDlg.scale')
-          }}</label>
-          <el-radio-group v-model="form.scaleMode">
-            <el-radio value="fit">{{ t('dialog.plotDlg.scaleFit') }}</el-radio>
-            <el-radio value="custom">{{
-              t('dialog.plotDlg.scaleCustom')
-            }}</el-radio>
-          </el-radio-group>
-          <template v-if="form.scaleMode === 'custom'">
+        <fieldset class="ml-plot-dlg__group">
+          <legend>{{ t('dialog.plotDlg.scaleGroup') }}</legend>
+          <div class="ml-plot-dlg__row">
+            <el-checkbox v-model="fitToPaper">{{
+              t('dialog.plotDlg.scaleFit')
+            }}</el-checkbox>
+          </div>
+          <div class="ml-plot-dlg__row">
+            <label class="ml-plot-dlg__label">{{
+              t('dialog.plotDlg.scale')
+            }}</label>
             <el-input-number
               v-model="form.scaleNumerator"
               :min="1"
               :max="100000"
               :controls="false"
+              :disabled="fitToPaper"
+              size="small"
               class="ml-plot-dlg__number"
             />
             <span class="ml-plot-dlg__x">{{
@@ -156,105 +241,111 @@
               :min="1"
               :max="100000"
               :controls="false"
+              :disabled="fitToPaper"
+              size="small"
               class="ml-plot-dlg__number"
             />
-          </template>
-        </div>
-
-        <div class="ml-plot-dlg__row">
-          <label class="ml-plot-dlg__label">{{
-            t('dialog.plotDlg.plotStyle')
-          }}</label>
-          <el-radio-group v-model="form.plotStyle">
-            <el-radio value="asIs">{{
-              t('dialog.plotDlg.styleAsIs')
-            }}</el-radio>
-            <el-radio value="monochrome">{{
-              t('dialog.plotDlg.styleMono')
-            }}</el-radio>
-            <el-radio value="grayscale">{{
-              t('dialog.plotDlg.styleGray')
-            }}</el-radio>
-            <el-radio value="ctb">{{
-              t('dialog.plotDlg.styleCtb')
-            }}</el-radio>
-          </el-radio-group>
-        </div>
-
-        <div v-if="form.plotStyle === 'ctb'" class="ml-plot-dlg__row">
-          <label class="ml-plot-dlg__label">{{
-            t('dialog.plotDlg.ctbFile')
-          }}</label>
-          <span v-if="ctbFileName" class="ml-plot-dlg__window-value">{{
-            ctbFileName
-          }}</span>
-          <span v-else class="ml-plot-dlg__preview-empty">{{
-            t('dialog.plotDlg.ctbNotLoaded')
-          }}</span>
-          <el-button
-            size="small"
-            :disabled="busy"
-            @click="selectCtbFile"
-          >
-            {{ t('dialog.plotDlg.ctbChoose') }}
-          </el-button>
-          <input
-            ref="ctbFileInput"
-            type="file"
-            accept=".ctb"
-            class="ml-plot-dlg__file-input"
-            @change="handleCtbFileSelected"
-          />
-        </div>
-
-        <div class="ml-plot-dlg__row">
-          <label class="ml-plot-dlg__label">{{
-            t('dialog.plotDlg.margins')
-          }}</label>
-          <el-input-number
-            v-model="form.marginMm"
-            :min="0"
-            :max="100"
-            :controls="false"
-            class="ml-plot-dlg__number"
-          />
-          <span class="ml-plot-dlg__unit">{{
-            t('dialog.plotDlg.unitMm')
-          }}</span>
-          <el-checkbox v-model="form.centerPlot" class="ml-plot-dlg__check">{{
-            t('dialog.plotDlg.centerPlot')
-          }}</el-checkbox>
-        </div>
-
-        <template v-if="form.layoutName">
-          <div class="ml-plot-dlg__section-title">
-            {{ t('dialog.plotDlg.viewportSection') }}
           </div>
-          <div class="ml-plot-dlg__row ml-plot-dlg__row--checks">
-            <el-checkbox v-model="form.drawViewportContent">{{
-              t('dialog.plotDlg.drawViewportContent')
-            }}</el-checkbox>
-            <el-checkbox v-model="form.plotViewportBorders">{{
-              t('dialog.plotDlg.plotViewportBorders')
-            }}</el-checkbox>
-          </div>
-        </template>
+        </fieldset>
       </div>
 
-      <div class="ml-plot-dlg__preview-pane">
-        <div class="ml-plot-dlg__preview-header">
-          <span>{{ t('dialog.plotDlg.preview') }}</span>
-          <el-button size="small" :loading="busy" @click="handlePreview">
-            {{ t('dialog.plotDlg.previewRefresh') }}
-          </el-button>
-        </div>
-        <div class="ml-plot-dlg__preview-sheet">
-          <!-- eslint-disable-next-line vue/no-v-html — markup is generated locally by the plot engine -->
-          <div v-if="previewSvg" class="ml-plot-dlg__svg" v-html="previewSvg" />
-          <div v-else class="ml-plot-dlg__preview-empty">
-            {{ t('dialog.plotDlg.previewEmpty') }}
+      <!-- Right column: plot style / options / orientation / preview -->
+      <div class="ml-plot-dlg__col">
+        <fieldset class="ml-plot-dlg__group">
+          <legend>{{ t('dialog.plotDlg.plotStyleGroup') }}</legend>
+          <div class="ml-plot-dlg__row">
+            <el-select
+              v-model="form.plotStyle"
+              class="ml-plot-dlg__control"
+              size="small"
+            >
+              <el-option :label="t('dialog.plotDlg.styleAsIs')" value="asIs" />
+              <el-option
+                :label="t('dialog.plotDlg.styleMono')"
+                value="monochrome"
+              />
+              <el-option
+                :label="t('dialog.plotDlg.styleGray')"
+                value="grayscale"
+              />
+              <el-option :label="t('dialog.plotDlg.styleCtb')" value="ctb" />
+            </el-select>
           </div>
-        </div>
+          <div v-if="form.plotStyle === 'ctb'" class="ml-plot-dlg__row">
+            <label class="ml-plot-dlg__label">{{
+              t('dialog.plotDlg.ctbFile')
+            }}</label>
+            <span v-if="ctbFileName" class="ml-plot-dlg__window-value">{{
+              ctbFileName
+            }}</span>
+            <span v-else class="ml-plot-dlg__preview-empty">{{
+              t('dialog.plotDlg.ctbNotLoaded')
+            }}</span>
+            <el-button size="small" :disabled="busy" @click="selectCtbFile">
+              {{ t('dialog.plotDlg.ctbChoose') }}
+            </el-button>
+            <input
+              ref="ctbFileInput"
+              type="file"
+              accept=".ctb"
+              class="ml-plot-dlg__file-input"
+              @change="handleCtbFileSelected"
+            />
+          </div>
+        </fieldset>
+
+        <fieldset class="ml-plot-dlg__group">
+          <legend>{{ t('dialog.plotDlg.optionsGroup') }}</legend>
+          <div class="ml-plot-dlg__row ml-plot-dlg__row--checks">
+            <el-checkbox v-model="form.plotTransparency">{{
+              t('dialog.plotDlg.plotTransparency')
+            }}</el-checkbox>
+          </div>
+          <template v-if="form.layoutName">
+            <div class="ml-plot-dlg__row ml-plot-dlg__row--checks">
+              <el-checkbox v-model="form.drawViewportContent">{{
+                t('dialog.plotDlg.drawViewportContent')
+              }}</el-checkbox>
+            </div>
+            <div class="ml-plot-dlg__row ml-plot-dlg__row--checks">
+              <el-checkbox v-model="form.plotViewportBorders">{{
+                t('dialog.plotDlg.plotViewportBorders')
+              }}</el-checkbox>
+            </div>
+          </template>
+        </fieldset>
+
+        <fieldset class="ml-plot-dlg__group">
+          <legend>{{ t('dialog.plotDlg.orientationGroup') }}</legend>
+          <el-radio-group v-model="form.orientation">
+            <el-radio value="portrait">{{
+              t('dialog.plotDlg.portrait')
+            }}</el-radio>
+            <el-radio value="landscape">{{
+              t('dialog.plotDlg.landscape')
+            }}</el-radio>
+          </el-radio-group>
+        </fieldset>
+
+        <fieldset class="ml-plot-dlg__group ml-plot-dlg__group--preview">
+          <legend>{{ t('dialog.plotDlg.preview') }}</legend>
+          <div class="ml-plot-dlg__preview-header">
+            <el-button size="small" :loading="busy" @click="handlePreview">
+              {{ t('dialog.plotDlg.previewRefresh') }}
+            </el-button>
+          </div>
+          <div class="ml-plot-dlg__preview-sheet">
+            <!-- eslint-disable-next-line vue/no-v-html — markup is generated locally by the plot engine -->
+            <div
+              v-if="previewSvg"
+              class="ml-plot-dlg__svg"
+              v-html="previewSvg"
+            />
+            <div v-else class="ml-plot-dlg__preview-empty">
+              {{ t('dialog.plotDlg.previewEmpty') }}
+            </div>
+          </div>
+        </fieldset>
       </div>
     </div>
   </ml-base-dialog>
@@ -263,24 +354,26 @@
 <script setup lang="ts">
 /**
  * AutoCAD-style Plot dialog (`plot` / `print`): collects page setup
- * options (layout, paper size, orientation, plot area, scale, plot style)
- * with a live sheet preview and runs the vector PDF plotting engine on OK.
- * Headless plotting without this UI is available via `-plot`.
+ * options (layout, paper size, orientation, plot area, offset, scale, plot
+ * style) with a live sheet preview and runs the vector PDF plotting engine
+ * on OK. Headless plotting without this UI is available via `-plot`.
  */
 import type {
+  AcApCtbTable,
   AcApPaperSize,
-  AcApPlotOptions,
   AcApPlotConvertor as AcApPlotConvertorType,
-  AcApCtbTable
+  AcApPlotOptions
 } from '@mlightcad/cad-pdf-plugin'
 import {
   AcApDocManager,
   AcEdPromptPointOptions,
   AcEdPromptStatus
 } from '@mlightcad/cad-simple-viewer'
+import { AcGePoint3d } from '@mlightcad/data-model'
 import {
   ElButton,
   ElCheckbox,
+  ElInput,
   ElInputNumber,
   ElMessage,
   ElOption,
@@ -354,9 +447,12 @@ const paperSizes = ref<AcApPaperSize[]>(FALLBACK_PAPER_SIZES)
 const layouts = ref<LayoutEntry[]>([])
 const busy = ref(false)
 const previewSvg = ref('')
-const plotWindow = ref<
-  { minX: number; minY: number; maxX: number; maxY: number } | null
->(null)
+const plotWindow = ref<{
+  minX: number
+  minY: number
+  maxX: number
+  maxY: number
+} | null>(null)
 const ctbTable = ref<AcApCtbTable | null>(null)
 const ctbFileName = ref('')
 const ctbFileInput = ref<HTMLInputElement | null>(null)
@@ -373,6 +469,9 @@ type PlotForm = Required<
     | 'plotStyle'
     | 'marginMm'
     | 'centerPlot'
+    | 'plotOffsetX'
+    | 'plotOffsetY'
+    | 'plotTransparency'
     | 'drawViewportContent'
     | 'plotViewportBorders'
   >
@@ -392,11 +491,22 @@ const form = reactive<PlotForm>({
   scaleMode: 'fit',
   scaleNumerator: 1,
   scaleDenominator: 1,
-  plotStyle: 'asIs',
+  plotStyle: 'ctb',
   marginMm: 5,
   centerPlot: true,
+  plotOffsetX: 0,
+  plotOffsetY: 0,
+  plotTransparency: true,
   drawViewportContent: true,
   plotViewportBorders: false
+})
+
+/** AutoCAD "Fit to paper" checkbox maps onto the fit/custom scale mode. */
+const fitToPaper = computed({
+  get: () => form.scaleMode === 'fit',
+  set: (value: boolean) => {
+    form.scaleMode = value ? 'fit' : 'custom'
+  }
 })
 
 async function loadCatalog() {
@@ -416,9 +526,12 @@ function resetForm() {
   form.scaleMode = 'fit'
   form.scaleNumerator = 1
   form.scaleDenominator = 1
-  form.plotStyle = 'asIs'
+  form.plotStyle = 'ctb'
   form.marginMm = 5
   form.centerPlot = true
+  form.plotOffsetX = 0
+  form.plotOffsetY = 0
+  form.plotTransparency = true
   form.drawViewportContent = true
   form.plotViewportBorders = false
   plotWindow.value = null
@@ -446,6 +559,40 @@ function handleOpen() {
   resetForm()
   refreshLayouts()
   void loadCatalog()
+  void loadDefaultCtb()
+}
+
+/**
+ * Loads the bundled default `monochrome.ctb` plot style table so the dialog
+ * opens ready to plot monochrome. A user-picked CTB (or another plot style)
+ * overrides it.
+ */
+async function loadDefaultCtb() {
+  try {
+    const { loadDefaultCtbTable, DEFAULT_CTB_NAME } =
+      await import('@mlightcad/cad-pdf-plugin')
+    const table = await loadDefaultCtbTable()
+    // Only apply if the user has not already loaded/selected something else.
+    if (form.plotStyle === 'ctb' && !ctbTable.value) {
+      ctbTable.value = table
+      ctbFileName.value = DEFAULT_CTB_NAME
+    }
+  } catch {
+    // Bundled CTB unavailable: leave the CTB unselected (user can pick one).
+  }
+}
+
+/**
+ * Guarantees a CTB table is available when the `ctb` plot style is active,
+ * falling back to the bundled default. Prevents a race where the user clicks
+ * Plot before the default finished loading.
+ */
+async function ensureCtbLoaded() {
+  if (form.plotStyle !== 'ctb' || ctbTable.value) return
+  const { loadDefaultCtbTable, DEFAULT_CTB_NAME } =
+    await import('@mlightcad/cad-pdf-plugin')
+  ctbTable.value = await loadDefaultCtbTable()
+  ctbFileName.value = DEFAULT_CTB_NAME
 }
 
 function handleLayoutChanged() {
@@ -485,7 +632,7 @@ async function pickWindow() {
     )
     secondPrompt.useDashedLine = true
     secondPrompt.useBasePoint = true
-    secondPrompt.basePoint = firstResult.value
+    secondPrompt.basePoint = new AcGePoint3d(firstResult.value)
     const secondResult = await editor.getPoint(secondPrompt)
     if (secondResult.status !== AcEdPromptStatus.OK || !secondResult.value) {
       return
@@ -524,10 +671,7 @@ async function handleCtbFileSelected(event: Event) {
     ctbFileName.value = file.name
     form.plotStyle = 'ctb'
     ElMessage({
-      message: t('dialog.plotDlg.ctbLoaded').replace(
-        '{name}',
-        file.name
-      ),
+      message: t('dialog.plotDlg.ctbLoaded').replace('{name}', file.name),
       grouping: true,
       type: 'success'
     })
@@ -558,6 +702,9 @@ function buildOptions(): AcApPlotOptions {
     ctbTable: ctbTable.value ?? undefined,
     marginMm: form.marginMm,
     centerPlot: form.centerPlot,
+    plotOffsetX: form.plotOffsetX,
+    plotOffsetY: form.plotOffsetY,
+    plotTransparency: form.plotTransparency,
     drawViewportContent: form.drawViewportContent,
     plotViewportBorders: form.plotViewportBorders
   }
@@ -579,6 +726,7 @@ async function withConvertor(
     }
     const { AcApPlotConvertor } = await import('@mlightcad/cad-pdf-plugin')
     busy.value = true
+    await ensureCtbLoaded()
     await run(new AcApPlotConvertor(), buildOptions())
   } catch (error) {
     const message =
@@ -619,14 +767,37 @@ async function handleOk() {
 .ml-plot-dlg {
   display: flex;
   gap: 16px;
-  min-height: 360px;
+  min-height: 420px;
+  align-items: flex-start;
 }
 
-.ml-plot-dlg__settings {
-  flex: 0 0 340px;
+.ml-plot-dlg__col {
+  flex: 1 1 0;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 12px;
+}
+
+.ml-plot-dlg__group {
+  border: 1px solid var(--el-border-color);
+  border-radius: 4px;
+  padding: 10px 12px 12px;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ml-plot-dlg__group > legend {
+  padding: 0 6px;
+  font-size: var(--ml-dialog-font-size, 12px);
+  font-weight: 600;
+  color: var(--el-text-color-primary);
+}
+
+.ml-plot-dlg__group--preview {
+  flex: 1 1 auto;
 }
 
 .ml-plot-dlg__row {
@@ -641,15 +812,19 @@ async function handleOk() {
 }
 
 .ml-plot-dlg__label {
-  flex: 0 0 88px;
+  flex: 0 0 78px;
   font-size: var(--ml-dialog-font-size, 12px);
-  font-weight: 600;
   color: var(--el-text-color-primary);
+}
+
+.ml-plot-dlg__label--inline {
+  flex: 0 0 auto;
+  margin-left: 8px;
 }
 
 .ml-plot-dlg__control {
   flex: 1 1 auto;
-  min-width: 180px;
+  min-width: 160px;
 }
 
 .ml-plot-dlg__number {
@@ -665,38 +840,20 @@ async function handleOk() {
   font-size: 11px;
 }
 
-.ml-plot-dlg__check {
-  margin-left: auto;
-}
-
-.ml-plot-dlg__section-title {
-  font-size: var(--ml-dialog-font-size, 12px);
-  font-weight: 600;
+.ml-plot-dlg__hint {
+  font-size: 11px;
   color: var(--el-text-color-secondary);
-  border-top: 1px solid var(--el-border-color-lighter);
-  padding-top: 10px;
-}
-
-.ml-plot-dlg__preview-pane {
-  flex: 1 1 auto;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  min-width: 0;
+  line-height: 1.4;
 }
 
 .ml-plot-dlg__preview-header {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  font-size: var(--ml-dialog-font-size, 12px);
-  font-weight: 600;
-  color: var(--el-text-color-primary);
+  justify-content: flex-end;
 }
 
 .ml-plot-dlg__preview-sheet {
   flex: 1 1 auto;
-  min-height: 280px;
+  min-height: 260px;
   border: 1px solid var(--el-border-color);
   border-radius: 4px;
   background: var(--el-fill-color-light);

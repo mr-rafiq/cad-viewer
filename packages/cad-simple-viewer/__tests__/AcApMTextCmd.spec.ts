@@ -65,9 +65,11 @@ describe('AcApMTextCmd', () => {
 
   it('persists the insertion location returned by the mtext editor', async () => {
     const appendEntity = jest.fn()
+    const addEntity = jest.fn()
     const context = {
       view: {
-        screenToWorld: ({ y }: { y: number }) => ({ x: 0, y: y * 0.5 })
+        screenToWorld: ({ y }: { y: number }) => ({ x: 0, y: y * 0.5 }),
+        addEntity
       },
       doc: {
         database: {
@@ -108,6 +110,9 @@ describe('AcApMTextCmd', () => {
       })
     )
     expect(appendEntity).toHaveBeenCalledTimes(1)
+    // The created entity must also be registered with the view so it renders.
+    expect(addEntity).toHaveBeenCalledTimes(1)
+    expect(addEntity.mock.calls[0][0]).toBe(appendEntity.mock.calls[0][0])
 
     const entity = appendEntity.mock.calls[0][0]
     expect(entity.contents).toBe('Hello')

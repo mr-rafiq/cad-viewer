@@ -66,6 +66,10 @@ export class AcApMTextCmd extends AcEdCommand {
     mtext.attachmentPoint = result.attachmentPoint
 
     context.doc.database.tables.blockTable.modelSpace.appendEntity(mtext)
+    // Register the entity with the view so it is drawn immediately, mirroring
+    // the other draw commands (for example LINE). Without this the mtext is
+    // added to the database but never rendered.
+    view.addEntity(mtext)
   }
 
   private pixelsToWorldY(view: AcTrView2d, pixels: number) {

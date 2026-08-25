@@ -14,6 +14,7 @@ import { AcDbViewport } from '@mlightcad/data-model'
 import { jsPDF } from 'jspdf'
 import { svg2pdf } from 'svg2pdf.js'
 
+import { type AcApCtbTable, createBuiltinCtb } from './AcApCtb'
 import type { ContentBox, PlotRect, PlotTransform } from './AcApPlotMath'
 import {
   computeContentTransform,
@@ -22,12 +23,11 @@ import {
   resolveSheetSizeMm
 } from './AcApPlotMath'
 import type { AcApPlotOptions } from './AcApPlotOptions'
-import { createBuiltinCtb, type AcApCtbTable } from './AcApCtb'
-import { AcCtbSvgRenderer } from './AcCtbSvgRenderer'
 import {
   type AcApViewportComposition,
   composeSheetSvg
 } from './AcApSheetComposer'
+import { AcCtbSvgRenderer } from './AcCtbSvgRenderer'
 
 /** Raw element output from one SVG render pass. */
 interface RenderPassResult {
@@ -100,9 +100,10 @@ export class AcApPlotConvertor {
 
     const ctbTable = this.resolveCtbTable(effectiveOptions)
     // Window plot area without a picked window falls back to extents.
-    const windowBox = effectiveOptions.plotArea === 'window'
-      ? this.normalizeWindow(effectiveOptions.plotWindow)
-      : undefined
+    const windowBox =
+      effectiveOptions.plotArea === 'window'
+        ? this.normalizeWindow(effectiveOptions.plotWindow)
+        : undefined
     const effectiveFinal =
       effectiveOptions.plotArea === 'window' && !windowBox
         ? { ...effectiveOptions, plotArea: 'extents' as const }
@@ -115,6 +116,7 @@ export class AcApPlotConvertor {
       layout?.plotPaperSize.y
     )
     const printable = computePrintableArea(sheet, effectiveOptions.marginMm)
+    const plotTransparency = effectiveOptions.plotTransparency !== false
 
     let contentMarkup: string | null = null
     let contentTransform: PlotTransform | null = null
@@ -128,15 +130,18 @@ export class AcApPlotConvertor {
         record,
         // Viewport borders come from AcDbViewport.worldDraw; include them
         // in the paper pass only when the user asked for plotted borders.
+        // The default full-sheet *Paper_Space viewport is never plotted.
         entity =>
           entity instanceof AcDbViewport &&
-          !effectiveFinal.plotViewportBorders,
-        ctbTable
+          (this.isDefaultPaperSpaceViewport(entity) ||
+            !effectiveFinal.plotViewportBorders),
+        ctbTable,
+        plotTransparency
       )
 
       // One shared model-space render pass reused by every viewport.
       const modelPass = effectiveFinal.drawViewportContent
-        ? this.drawModelSpace(source, ctbTable)
+        ? this.drawModelSpace(source, ctbTable, plotTransparency)
         : null
 
       for (const viewport of viewports) {
@@ -153,25 +158,31 @@ export class AcApPlotConvertor {
               paperPass.bbox,
               ...viewports.map(viewport => this.boxOf(viewport))
             )
-          : windowBox ?? paperPass.bbox
+          : (windowBox ?? paperPass.bbox)
       const factor = this.requireFactor(contentBox, printable, effectiveFinal)
+      const [offsetX, offsetY] = this.resolveOffset(effectiveFinal)
       contentTransform = computeContentTransform(
         contentBox,
         factor,
         printable,
-        effectiveFinal.centerPlot
+        effectiveFinal.centerPlot,
+        offsetX,
+        offsetY
       )
       contentMarkup = paperPass.markup || null
       this.mapCompositionsToSheet(compositions, contentTransform)
     } else {
-      const modelPass = this.drawModelSpace(source, ctbTable)
+      const modelPass = this.drawModelSpace(source, ctbTable, plotTransparency)
       const contentBox = windowBox ?? modelPass.bbox
       const factor = this.requireFactor(contentBox, printable, effectiveFinal)
+      const [offsetX, offsetY] = this.resolveOffset(effectiveFinal)
       contentTransform = computeContentTransform(
         contentBox,
         factor,
         printable,
-        effectiveFinal.centerPlot
+        effectiveFinal.centerPlot,
+        offsetX,
+        offsetY
       )
       contentMarkup = modelPass.markup || null
     }
@@ -209,7 +220,11 @@ export class AcApPlotConvertor {
     return downloadName
   }
 
-  private configureRenderer(renderer: AcSvgRenderer, source: AcApPlotSource) {
+  private configureRenderer(
+    renderer: AcSvgRenderer,
+    source: AcApPlotSource,
+    plotTransparency: boolean
+  ) {
     const db = source.doc.database
     renderer.ltscale = db.ltscale
     renderer.celtscale = db.celtscale
@@ -219,6 +234,20 @@ export class AcApPlotConvertor {
     // resolves correctly regardless of canvas theme.
     renderer.currentBackgroundColor = 0xffffff
     renderer.changeForeground(0x000000)
+    // AutoCAD's "Plot transparency" defaults off; honor the option so
+    // geometry can be forced fully opaque.
+    renderer.plotTransparency = plotTransparency
+  }
+
+  /**
+   * Resolves the plot offset in millimeters. Centering ignores the manual
+   * offset, matching AutoCAD (the X/Y fields are read-only when centered).
+   */
+  private resolveOffset(
+    options: Pick<AcApPlotOptions, 'centerPlot' | 'plotOffsetX' | 'plotOffsetY'>
+  ): [number, number] {
+    if (options.centerPlot) return [0, 0]
+    return [options.plotOffsetX ?? 0, options.plotOffsetY ?? 0]
   }
 
   /**
@@ -226,9 +255,10 @@ export class AcApPlotConvertor {
    */
   private drawModelSpace(
     source: AcApPlotSource,
-    ctbTable: AcApCtbTable | null
+    ctbTable: AcApCtbTable | null,
+    plotTransparency: boolean
   ): RenderPassResult {
-    const renderer = this.createRenderer(source, ctbTable)
+    const renderer = this.createRenderer(source, ctbTable, plotTransparency)
     const entities =
       source.doc.database.tables.blockTable.modelSpace.newIterator()
     for (const entity of entities) {
@@ -249,12 +279,13 @@ export class AcApPlotConvertor {
     source: AcApPlotSource,
     record: AcDbBlockTableRecord | undefined,
     skip: (entity: AcDbEntity) => boolean,
-    ctbTable: AcApCtbTable | null
+    ctbTable: AcApCtbTable | null,
+    plotTransparency: boolean
   ): RenderPassResult {
     if (!record) {
       return { markup: '', bbox: { ...EMPTY_BOX } }
     }
-    const renderer = this.createRenderer(source, ctbTable)
+    const renderer = this.createRenderer(source, ctbTable, plotTransparency)
     for (const entity of record.newIterator()) {
       if (skip(entity)) continue
       entity.worldDraw(renderer)
@@ -270,12 +301,13 @@ export class AcApPlotConvertor {
    */
   private createRenderer(
     source: AcApPlotSource,
-    ctbTable: AcApCtbTable | null
+    ctbTable: AcApCtbTable | null,
+    plotTransparency: boolean
   ): AcSvgRenderer {
     const renderer = ctbTable
       ? new AcCtbSvgRenderer(ctbTable)
       : new AcSvgRenderer()
-    this.configureRenderer(renderer, source)
+    this.configureRenderer(renderer, source, plotTransparency)
     return renderer
   }
 

@@ -81,6 +81,13 @@ export interface AcApCtbTable {
   getStyle(aci: number): AcApCtbEntry | undefined
 }
 
+/**
+ * One parsed block from the CTB text body: a name→value map whose values
+ * are either scalar strings or nested blocks (the format nests arbitrarily
+ * deep, e.g. `aci_table{ 0{ ... } }`).
+ */
+type CtbBlock = { [key: string]: string | CtbBlock }
+
 const OBJECT_COLOR = -1
 const OBJECT_COLOR2 = -1006632961
 const COLOR_TYPE_RGB = 0xc2
@@ -115,8 +122,8 @@ export function parseCtbText(text: string): AcApCtbTable {
   const nameOf = (line: string) =>
     line.endsWith('{') ? line.slice(0, -1).trim() : line.split('=', 1)[0].trim()
 
-  function parseBlock(): Record<string, string | Record<string, string>> {
-    const data: Record<string, string | Record<string, string>> = {}
+  function parseBlock(): CtbBlock {
+    const data: CtbBlock = {}
     index++ // skip the "{..." line
     while (index < lines.length && !lines[index]!.trimEnd().endsWith('}')) {
       const line = lines[index]!
@@ -156,9 +163,7 @@ export function parseCtbText(text: string): AcApCtbTable {
     } else {
       if (name === 'description') {
         // description="Comment — strip the leading quote.
-        table.description = sanitizeValue(
-          line.split('=').slice(1).join('=')
-        )
+        table.description = sanitizeValue(line.split('=').slice(1).join('='))
       }
       index++
     }
@@ -171,7 +176,7 @@ export function parseCtbText(text: string): AcApCtbTable {
  * Parses style entries from the `aci_table` / `plot_style` block.
  */
 function parseStyleEntries(
-  block: Record<string, string | Record<string, string>>,
+  block: CtbBlock,
   lineweights: number[]
 ): (AcApCtbEntry | undefined)[] {
   const styles: (AcApCtbEntry | undefined)[] = []
@@ -187,10 +192,7 @@ function parseStyleEntries(
 /**
  * Converts one raw style record into a typed entry.
  */
-function toEntry(
-  record: Record<string, string>,
-  lineweights: number[]
-): AcApCtbEntry {
+function toEntry(record: CtbBlock, lineweights: number[]): AcApCtbEntry {
   const colorValue = Number(record['color'] ?? OBJECT_COLOR)
   const modeColorValue =
     record['mode_color'] != null ? Number(record['mode_color']) : colorValue
@@ -220,11 +222,12 @@ function unpackColor(color: number, modeColor: number): AcApCtbColor {
   const r = (value >>> 16) & 0xff
   const g = (value >>> 8) & 0xff
   const b = value & 0xff
-  if (colorType === COLOR_TYPE_RGB) {
+  // AutoCAD stores the resolved output color in the low 24 bits of
+  // `mode_color` for both true-color (0xC2) and ACI (0xC3) plot styles — the
+  // 0xC3 method byte does *not* mean "blue byte is an ACI index". A real
+  // monochrome.ctb, for example, encodes black as 0xC3000000.
+  if (colorType === COLOR_TYPE_RGB || colorType === COLOR_TYPE_ACI) {
     return { kind: 'rgb', r, g, b }
-  }
-  if (colorType === COLOR_TYPE_ACI) {
-    return { kind: 'aci', index: b }
   }
   // COLOR_BY_LAYER / COLOR_BY_BLOCK and anything unknown: draw as-is.
   return { kind: 'object' }
@@ -325,11 +328,11 @@ export function applyScreening(
 /**
  * Desaturates an RGB color using Rec. 601 luma.
  */
-export function toGrayscale(rgb: {
+export function toGrayscale(rgb: { r: number; g: number; b: number }): {
   r: number
   g: number
   b: number
-}): { r: number; g: number; b: number } {
+} {
   const gray = Math.round(0.299 * rgb.r + 0.587 * rgb.g + 0.114 * rgb.b)
   return { r: gray, g: gray, b: gray }
 }

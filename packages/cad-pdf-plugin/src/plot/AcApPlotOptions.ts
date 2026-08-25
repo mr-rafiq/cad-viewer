@@ -71,6 +71,15 @@ export interface AcApPlotOptions {
   marginMm: number
   /** Centers the plotted content inside the printable area. */
   centerPlot: boolean
+  /** Horizontal plot offset in millimeters (ignored when `centerPlot`). */
+  plotOffsetX?: number
+  /** Vertical plot offset in millimeters, positive = up (ignored when `centerPlot`). */
+  plotOffsetY?: number
+  /**
+   * Plots object transparency. When `false`, geometry is plotted fully
+   * opaque (AutoCAD's default "Plot transparency" off). Defaults to `true`.
+   */
+  plotTransparency?: boolean
   /**
    * For layout plots: renders model space through each paper-space viewport,
    * clipped to the viewport rectangle.
@@ -89,9 +98,12 @@ export const DEFAULT_PLOT_OPTIONS: AcApPlotOptions = {
   scaleMode: 'fit',
   scaleNumerator: 1,
   scaleDenominator: 1,
-  plotStyle: 'asIs',
+  plotStyle: 'monochrome',
   marginMm: 5,
   centerPlot: true,
+  plotOffsetX: 0,
+  plotOffsetY: 0,
+  plotTransparency: true,
   drawViewportContent: true,
   plotViewportBorders: false
 }

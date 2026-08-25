@@ -56,6 +56,7 @@ export class AcSvgRenderer implements AcGiRenderer<AcSvgEntity> {
   private _currentBackgroundColor = 0x000000
   private _foregroundColor = 0x000000
   private _showLineWeight = false
+  private _plotTransparency = true
   private _pendingImages: Promise<void>[]
 
   constructor() {
@@ -153,13 +154,27 @@ export class AcSvgRenderer implements AcGiRenderer<AcSvgEntity> {
     this._showLineWeight = value
   }
 
+  /**
+   * Whether entity transparency is emitted. When `false`, geometry is drawn
+   * fully opaque, mirroring AutoCAD's "Plot transparency" option (off by
+   * default there). Defaults to `true` so on-screen SVG matches the drawing.
+   */
+  get plotTransparency(): boolean {
+    return this._plotTransparency
+  }
+
+  set plotTransparency(value: boolean) {
+    this._plotTransparency = value
+  }
+
   private get styleContext(): AcSvgStyleContext {
     return {
       ltscale: this._ltscale,
       celtscale: this._celtscale,
       backgroundColor: this._currentBackgroundColor,
       foregroundColor: this._foregroundColor,
-      showLineWeight: this._showLineWeight
+      showLineWeight: this._showLineWeight,
+      plotTransparency: this._plotTransparency
     }
   }
 

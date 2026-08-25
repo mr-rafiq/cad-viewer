@@ -1,3 +1,4 @@
+import { AcSvgRenderer } from '@mlightcad/cad-svg-plugin'
 import type {
   AcGeArea2d,
   AcGeCircArc3d,
@@ -11,17 +12,13 @@ import type {
   AcGiSubEntityTraits,
   AcGiTextStyle
 } from '@mlightcad/data-model'
-import {
-  AcCmColor,
-  AcCmColorUtil
-} from '@mlightcad/data-model'
-import { AcSvgRenderer } from '@mlightcad/cad-svg-plugin'
+import { AcCmColor, AcCmColorUtil } from '@mlightcad/data-model'
 
 import {
-  applyScreening,
-  toGrayscale,
   type AcApCtbEntry,
-  type AcApCtbTable
+  type AcApCtbTable,
+  applyScreening,
+  toGrayscale
 } from './AcApCtb'
 
 /**
@@ -93,6 +90,32 @@ export class AcCtbSvgRenderer extends AcSvgRenderer {
   }
 
   /**
+   * Resolves an AutoCAD Color Index to RGB channels for plotting.
+   *
+   * ACI 7 is background-dependent: it plots in the foreground color that
+   * contrasts with the sheet (black on white paper), matching how the base
+   * renderer resolves it through {@link AcGiContext}. Resolving it via the
+   * raw palette instead would return white and vanish on the white sheet.
+   */
+  private aciToRgb(aci: number): { r: number; g: number; b: number } | null {
+    if (aci === 7) {
+      const bg = this.currentBackgroundColor
+      const luma =
+        0.299 * ((bg >>> 16) & 0xff) +
+        0.587 * ((bg >>> 8) & 0xff) +
+        0.114 * (bg & 0xff)
+      return luma >= 128 ? { r: 0, g: 0, b: 0 } : { r: 255, g: 255, b: 255 }
+    }
+    const value = AcCmColorUtil.getColorByIndex(aci)
+    if (value == null) return null
+    return {
+      r: (value >>> 16) & 0xff,
+      g: (value >>> 8) & 0xff,
+      b: value & 0xff
+    }
+  }
+
+  /**
    * Writes the CTB output color (with screening and grayscale applied)
    * into the traits.
    */
@@ -106,26 +129,11 @@ export class AcCtbSvgRenderer extends AcSvgRenderer {
     if (entry.color.kind === 'rgb') {
       rgb = { r: entry.color.r, g: entry.color.g, b: entry.color.b }
     } else if (entry.color.kind === 'aci') {
-      const value = AcCmColorUtil.getColorByIndex(entry.color.index)
-      if (value != null) {
-        rgb = {
-          r: (value >>> 16) & 0xff,
-          g: (value >>> 8) & 0xff,
-          b: value & 0xff
-        }
-      }
+      rgb = this.aciToRgb(entry.color.index)
     } else if (entry.grayscale || entry.screen < 100) {
       // Object color with screening/grayscale: resolve the trait color to
       // RGB so the effect can be applied.
-      const resolved =
-        aci != null ? AcCmColorUtil.getColorByIndex(aci) : undefined
-      if (resolved != null) {
-        rgb = {
-          r: (resolved >>> 16) & 0xff,
-          g: (resolved >>> 8) & 0xff,
-          b: resolved & 0xff
-        }
-      }
+      rgb = aci != null ? this.aciToRgb(aci) : null
     }
 
     if (!rgb) {
@@ -218,11 +226,7 @@ export class AcCtbSvgRenderer extends AcSvgRenderer {
   /**
    * @inheritdoc
    */
-  override mtext(
-    mtext: AcGiMTextData,
-    style: AcGiTextStyle,
-    delay?: boolean
-  ) {
+  override mtext(mtext: AcGiMTextData, style: AcGiTextStyle, delay?: boolean) {
     this.applyCtbToTraits()
     return super.mtext(mtext, style, delay)
   }
@@ -230,11 +234,7 @@ export class AcCtbSvgRenderer extends AcSvgRenderer {
   /**
    * @inheritdoc
    */
-  override shape(
-    shape: AcGiShapeData,
-    style: AcGiTextStyle,
-    delay?: boolean
-  ) {
+  override shape(shape: AcGiShapeData, style: AcGiTextStyle, delay?: boolean) {
     this.applyCtbToTraits()
     return super.shape(shape, style, delay)
   }

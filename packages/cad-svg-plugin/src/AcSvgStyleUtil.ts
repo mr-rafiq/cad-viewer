@@ -15,6 +15,11 @@ export interface AcSvgStyleContext {
   foregroundColor: number
   /** Mirrors LWDISPLAY: when false, lineweights are not rendered. */
   showLineWeight: boolean
+  /**
+   * When explicitly `false`, entity transparency is dropped and geometry is
+   * drawn fully opaque (AutoCAD "Plot transparency" off). Defaults to on.
+   */
+  plotTransparency?: boolean
 }
 
 export type AcSvgPrimitiveKind = 'line' | 'fill' | 'text' | 'point'
@@ -70,7 +75,7 @@ export class AcSvgStyleUtil {
       }
     }
 
-    const opacity = this.resolveOpacity(traits)
+    const opacity = this.resolveOpacity(traits, ctx)
     if (opacity != null && opacity < 1) {
       attrs['stroke-opacity'] = String(opacity)
     }
@@ -93,7 +98,7 @@ export class AcSvgStyleUtil {
       stroke: 'none'
     }
 
-    const opacity = this.resolveOpacity(traits)
+    const opacity = this.resolveOpacity(traits, ctx)
     if (opacity != null && opacity < 1) {
       attrs['fill-opacity'] = String(opacity)
     }
@@ -111,7 +116,7 @@ export class AcSvgStyleUtil {
       stroke: 'none'
     }
 
-    const opacity = this.resolveOpacity(traits)
+    const opacity = this.resolveOpacity(traits, ctx)
     if (opacity != null && opacity < 1) {
       attrs['fill-opacity'] = String(opacity)
     }
@@ -163,7 +168,13 @@ export class AcSvgStyleUtil {
     return Math.max(0.01, lineWeight / 100)
   }
 
-  private static resolveOpacity(traits: AcGiSubEntityTraits): number | null {
+  private static resolveOpacity(
+    traits: AcGiSubEntityTraits,
+    ctx: AcSvgStyleContext
+  ): number | null {
+    if (ctx.plotTransparency === false) {
+      return null
+    }
     const alpha = traits.transparency?.alpha
     if (alpha == null || Number.isNaN(alpha)) {
       return null

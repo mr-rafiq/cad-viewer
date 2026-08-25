@@ -35,6 +35,23 @@ export {
 } from './plot/AcApPlotOptions'
 export { AcApPlotConvertor } from './plot/AcApPlotConvertor'
 export {
+  applyScreening,
+  createBuiltinCtb,
+  parseCtbFile,
+  parseCtbText,
+  rgbToCss,
+  toGrayscale,
+  type AcApCtbColor,
+  type AcApCtbEntry,
+  type AcApCtbTable
+} from './plot/AcApCtb'
+export { AcCtbSvgRenderer } from './plot/AcCtbSvgRenderer'
+export {
+  DEFAULT_CTB_BASE64,
+  DEFAULT_CTB_NAME,
+  loadDefaultCtbTable
+} from './plot/AcApDefaultCtb'
+export {
   composeSheetSvg,
   toMatrixAttribute,
   type AcApSheetComposerParams,

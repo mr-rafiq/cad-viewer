@@ -4,12 +4,12 @@ import {
   computeScaleFactor,
   resolveSheetSizeMm
 } from '../src/plot/AcApPlotMath'
+import { DEFAULT_PLOT_OPTIONS } from '../src/plot/AcApPlotOptions'
+import { convertColorForPlotStyle } from '../src/plot/AcApPlotStyleProcessor'
 import {
   composeSheetSvg,
   toMatrixAttribute
 } from '../src/plot/AcApSheetComposer'
-import { DEFAULT_PLOT_OPTIONS } from '../src/plot/AcApPlotOptions'
-import { convertColorForPlotStyle } from '../src/plot/AcApPlotStyleProcessor'
 
 describe('computeScaleFactor', () => {
   const printable = { x: 0, y: 0, width: 200, height: 100 }

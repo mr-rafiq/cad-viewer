@@ -164,17 +164,26 @@ export function computeScaleFactor(
  * - centered: content center lands at the printable area center;
  * - not centered: content top-left lands at the printable area origin.
  *
+ * An optional plot offset shifts the positioned content on the sheet
+ * (AutoCAD "Plot offset"): `offsetX` moves it right, `offsetY` moves it up.
+ * The sheet is Y-down, so a positive `offsetY` subtracts from the vertical
+ * translation.
+ *
  * @param content - Content bounding box in drawing units
  * @param factor - Scale factor in millimeters per drawing unit
  * @param printable - Printable area rect on the sheet in millimeters
  * @param centerPlot - Whether to center content inside the printable area
+ * @param offsetX - Horizontal plot offset in millimeters (default 0)
+ * @param offsetY - Vertical plot offset in millimeters, positive = up (default 0)
  * @returns SVG matrix parameters
  */
 export function computeContentTransform(
   content: ContentBox,
   factor: number,
   printable: PlotRect,
-  centerPlot: boolean
+  centerPlot: boolean,
+  offsetX = 0,
+  offsetY = 0
 ): PlotTransform {
   const cx = (content.minX + content.maxX) / 2
   const cy = (content.minY + content.maxY) / 2
@@ -190,7 +199,9 @@ export function computeContentTransform(
     f = printable.y + factor * content.maxY
     e = printable.x - factor * content.minX
   }
-  return { a: factor, b: 0, c: 0, d: -factor, e, f }
+  const dx = Number.isFinite(offsetX) ? offsetX : 0
+  const dy = Number.isFinite(offsetY) ? offsetY : 0
+  return { a: factor, b: 0, c: 0, d: -factor, e: e + dx, f: f - dy }
 }
 
 /**
