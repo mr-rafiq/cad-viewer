@@ -120,6 +120,7 @@ export class AcApPlotConvertor {
 
     let contentMarkup: string | null = null
     let contentTransform: PlotTransform | null = null
+    let contentClipRect: PlotRect | null = null
     const compositions: AcApViewportComposition[] = []
 
     if (layout) {
@@ -170,6 +171,9 @@ export class AcApPlotConvertor {
         offsetY
       )
       contentMarkup = paperPass.markup || null
+      if (windowBox) {
+        contentClipRect = this.windowClipRect(windowBox, contentTransform)
+      }
       this.mapCompositionsToSheet(compositions, contentTransform)
     } else {
       const modelPass = this.drawModelSpace(source, ctbTable, plotTransparency)
@@ -185,6 +189,9 @@ export class AcApPlotConvertor {
         offsetY
       )
       contentMarkup = modelPass.markup || null
+      if (windowBox) {
+        contentClipRect = this.windowClipRect(windowBox, contentTransform)
+      }
     }
 
     const svg = composeSheetSvg({
@@ -194,6 +201,7 @@ export class AcApPlotConvertor {
       contentMarkup,
       contentTransform,
       clipToPrintableArea: true,
+      contentClipRect,
       viewportCompositions: compositions
     })
     return svg
@@ -455,6 +463,24 @@ export class AcApPlotConvertor {
    * Maps viewport rectangles from paper-space drawing units onto sheet
    * millimeters using the same affine transform applied to paper content.
    */
+  /**
+   * Maps a plot-window box from drawing units onto the sheet (millimeters)
+   * using the content transform, producing the clip rectangle that crops
+   * everything outside the picked window.
+   */
+  private windowClipRect(box: ContentBox, transform: PlotTransform): PlotRect {
+    const x1 = transform.a * box.minX + transform.e
+    const x2 = transform.a * box.maxX + transform.e
+    const y1 = transform.d * box.minY + transform.f
+    const y2 = transform.d * box.maxY + transform.f
+    return {
+      x: Math.min(x1, x2),
+      y: Math.min(y1, y2),
+      width: Math.abs(x2 - x1),
+      height: Math.abs(y2 - y1)
+    }
+  }
+
   private mapCompositionsToSheet(
     compositions: AcApViewportComposition[],
     transform: PlotTransform

@@ -150,6 +150,30 @@ describe('composeSheetSvg', () => {
     expect(svg).toContain('"-15 -20 30 40"')
   })
 
+  it('clips the content group to the window rect when provided', () => {
+    const svg = composeSheetSvg({
+      sheet,
+      printable: { x: 0, y: 0, width: sheet.width, height: sheet.height },
+      contentMarkup: '<path d="M0 0 L10 10"/>',
+      contentTransform: { a: 1, b: 0, c: 0, d: -1, e: 0, f: 100 },
+      contentClipRect: { x: 20, y: 30, width: 40, height: 50 }
+    })
+    // A dedicated window clip path is defined and applied to content.
+    expect(svg).toContain('id="ml-plot-window"')
+    expect(svg).toContain('clip-path="url(#ml-plot-window)"')
+    expect(svg).toContain('x="20" y="30" width="40" height="50"')
+  })
+
+  it('omits the window clip when no rect is provided', () => {
+    const svg = composeSheetSvg({
+      sheet,
+      printable: { x: 0, y: 0, width: sheet.width, height: sheet.height },
+      contentMarkup: '<path d="M0 0 L10 10"/>',
+      contentTransform: { a: 1, b: 0, c: 0, d: -1, e: 0, f: 100 }
+    })
+    expect(svg).not.toContain('ml-plot-window')
+  })
+
   it('keeps the sheet valid when there is nothing to draw', () => {
     const svg = composeSheetSvg({
       sheet,

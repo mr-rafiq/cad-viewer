@@ -48,6 +48,12 @@ export interface AcApSheetComposerParams {
   contentTransform?: PlotTransform | null
   /** Clips main content to the printable area when true (default). */
   clipToPrintableArea?: boolean
+  /**
+   * Optional extra clip rectangle (sheet millimeters) applied to the main
+   * content group only — used by window plots so geometry outside the
+   * picked window is cropped instead of bleeding into the sheet margins.
+   */
+  contentClipRect?: PlotRect | null
   /** Per-viewport model-space compositions (layout plots only). */
   viewportCompositions?: AcApViewportComposition[]
 }
@@ -129,10 +135,16 @@ export function composeSheetSvg(params: AcApSheetComposerParams): string {
     contentMarkup,
     contentTransform,
     clipToPrintableArea = true,
+    contentClipRect,
     viewportCompositions = []
   } = params
 
   const clipId = 'ml-plot-area'
+  const windowClipId = 'ml-plot-window'
+  const hasWindowClip =
+    contentClipRect != null &&
+    contentClipRect.width > 0 &&
+    contentClipRect.height > 0
   const clipOpen =
     clipToPrintableArea && printable.width > 0 && printable.height > 0
       ? `<g clip-path="url(#${clipId})">`
@@ -148,7 +160,15 @@ export function composeSheetSvg(params: AcApSheetComposerParams): string {
   <defs>
     <clipPath id="${clipId}"><rect x="${fmt(printable.x)}" y="${fmt(
       printable.y
-    )}" width="${fmt(printable.width)}" height="${fmt(printable.height)}"/></clipPath>
+    )}" width="${fmt(printable.width)}" height="${fmt(printable.height)}"/></clipPath>${
+      hasWindowClip
+        ? `\n    <clipPath id="${windowClipId}"><rect x="${fmt(
+            contentClipRect!.x
+          )}" y="${fmt(contentClipRect!.y)}" width="${fmt(
+            contentClipRect!.width
+          )}" height="${fmt(contentClipRect!.height)}"/></clipPath>`
+        : ''
+    }
   </defs>
   <rect x="${fmt(sheet.x)}" y="${fmt(sheet.y)}" width="${fmt(
     sheet.width
@@ -158,8 +178,13 @@ export function composeSheetSvg(params: AcApSheetComposerParams): string {
 
   let hasContent = false
   if (contentMarkup && contentTransform) {
+    const contentGroup = `  <g transform="${toMatrixAttribute(
+      contentTransform
+    )}">\n${contentMarkup}\n  </g>`
     parts.push(
-      `  <g transform="${toMatrixAttribute(contentTransform)}">\n${contentMarkup}\n  </g>`
+      hasWindowClip
+        ? `  <g clip-path="url(#${windowClipId})">\n${contentGroup}\n  </g>`
+        : contentGroup
     )
     hasContent = true
   }

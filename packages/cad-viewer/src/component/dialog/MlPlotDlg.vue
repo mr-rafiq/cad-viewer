@@ -366,10 +366,9 @@ import type {
 } from '@mlightcad/cad-pdf-plugin'
 import {
   AcApDocManager,
-  AcEdPromptPointOptions,
+  AcEdPromptBoxOptions,
   AcEdPromptStatus
 } from '@mlightcad/cad-simple-viewer'
-import { AcGePoint3d } from '@mlightcad/data-model'
 import {
   ElButton,
   ElCheckbox,
@@ -555,7 +554,17 @@ function refreshLayouts() {
   layouts.value.sort((a, b) => a.tabOrder - b.tabOrder)
 }
 
+// The base dialog emits `open` on every show. `pickWindow` hides then
+// re-shows the dialog to let the user pick corners on the canvas; that
+// re-show must NOT reset the form (which would wipe the just-picked window
+// and force the preview back to extents).
+let suppressReopenReset = false
+
 function handleOpen() {
+  if (suppressReopenReset) {
+    suppressReopenReset = false
+    return
+  }
   resetForm()
   refreshLayouts()
   void loadCatalog()
@@ -612,41 +621,41 @@ const windowText = computed(() => {
 })
 
 /**
- * Hides the dialog, lets the user pick two opposite corners in the
- * drawing view (like AutoCAD's "Window <" plot area), then reopens the
- * dialog with the window set.
+ * Hides the dialog, lets the user drag a rectangular window in the drawing
+ * view (like AutoCAD's "Window <" plot area), then reopens the dialog with
+ * the window set. Uses the editor's rectangular box rubber-band rather than
+ * a line so the selection reads as a window.
  */
 async function pickWindow() {
   const editor = AcApDocManager.instance.editor
   visible.value = false
   try {
-    const firstPrompt = new AcEdPromptPointOptions(
-      t('dialog.plotDlg.pickFirstCorner')
-    )
-    const firstResult = await editor.getPoint(firstPrompt)
-    if (firstResult.status !== AcEdPromptStatus.OK || !firstResult.value) {
-      return
-    }
-    const secondPrompt = new AcEdPromptPointOptions(
+    const boxPrompt = new AcEdPromptBoxOptions(
+      t('dialog.plotDlg.pickFirstCorner'),
       t('dialog.plotDlg.pickSecondCorner')
     )
-    secondPrompt.useDashedLine = true
-    secondPrompt.useBasePoint = true
-    secondPrompt.basePoint = new AcGePoint3d(firstResult.value)
-    const secondResult = await editor.getPoint(secondPrompt)
-    if (secondResult.status !== AcEdPromptStatus.OK || !secondResult.value) {
+    boxPrompt.useBasePoint = false
+    boxPrompt.useDashedLine = false
+    const boxResult = await editor.getBox(boxPrompt)
+    if (boxResult.status !== AcEdPromptStatus.OK || !boxResult.value) {
       return
     }
+    const box = boxResult.value
     plotWindow.value = {
-      minX: Math.min(firstResult.value.x, secondResult.value.x),
-      minY: Math.min(firstResult.value.y, secondResult.value.y),
-      maxX: Math.max(firstResult.value.x, secondResult.value.x),
-      maxY: Math.max(firstResult.value.y, secondResult.value.y)
+      minX: Math.min(box.min.x, box.max.x),
+      minY: Math.min(box.min.y, box.max.y),
+      maxX: Math.max(box.min.x, box.max.x),
+      maxY: Math.max(box.min.y, box.max.y)
     }
     form.plotArea = 'window'
-    await handlePreview()
   } finally {
+    // Re-show without resetting the form, then refresh the preview so it
+    // reflects the newly picked window instead of the extents.
+    suppressReopenReset = true
     visible.value = true
+  }
+  if (plotWindow.value) {
+    await handlePreview()
   }
 }
 
