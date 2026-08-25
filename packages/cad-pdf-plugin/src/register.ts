@@ -7,9 +7,10 @@ export const PDF_PLUGIN_NAME = 'PdfPlugin'
  * Trigger commands handled by {@link PDF_PLUGIN_NAME}.
  *
  * - `cpdf` — export drawing to PDF
+ * - `-plot` — headless AutoCAD-style plot to vector PDF
  * - `ipdf` — import vector geometry from PDF
  */
-export const PDF_PLUGIN_TRIGGERS = ['cpdf', 'ipdf'] as const
+export const PDF_PLUGIN_TRIGGERS = ['cpdf', '-plot', 'ipdf'] as const
 
 /**
  * Registers the PDF plugin for lazy loading.

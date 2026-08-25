@@ -24,6 +24,7 @@ import {
   AcApMemCmd,
   AcApMissedDataCmd,
   AcApOpenPerfCmd,
+  AcApPlotDlgCmd,
   AcApPointStyleCmd,
   AcApPropertiesCmd,
   AcApQSelectCmd,
@@ -37,6 +38,7 @@ import {
   MlAttEditDlg,
   MlDrawingUnitsDlg,
   MlExportHtmlDlg,
+  MlPlotDlg,
   MlPointStyleDlg,
   MlQuickSelectDlg,
   MlTextStyleDlg
@@ -90,6 +92,13 @@ export const registerCmds = () => {
       'chtml',
       'chtml',
       new AcApExportHtmlDlgCmd()
+    )
+    register.addCommand(
+      AcEdCommandStack.SYSTEMT_COMMAND_GROUP_NAME,
+      'plot',
+      'plot',
+      new AcApPlotDlgCmd(),
+      ['print']
     )
     register.addCommand(
       AcEdCommandStack.SYSTEMT_COMMAND_GROUP_NAME,
@@ -178,6 +187,11 @@ export const registerDialogs = () => {
     registerDialog({
       name: 'ExportHtmlDlg',
       component: markRaw(MlExportHtmlDlg),
+      props: {}
+    })
+    registerDialog({
+      name: 'PlotDlg',
+      component: markRaw(MlPlotDlg),
       props: {}
     })
     registerDialog({

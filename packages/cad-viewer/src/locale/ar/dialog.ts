@@ -103,25 +103,21 @@ export default {
 
     layoutsSection: 'المخططات',
     exportLayouts: 'تصدير المخططات',
-    exportLayoutsHint:
-      'تضمين مخططات مساحة الورق في الملف المُصدّر',
+    exportLayoutsHint: 'تضمين مخططات مساحة الورق في الملف المُصدّر',
 
     yes: 'نعم',
     no: 'لا',
 
     initialView: 'العرض الأولي',
     initialViewExtents: 'حدود الرسم',
-    initialViewExtentsHint:
-      'تكبير العرض إلى حدود الرسم عند فتح ملف HTML',
+    initialViewExtentsHint: 'تكبير العرض إلى حدود الرسم عند فتح ملف HTML',
 
     initialViewCurrent: 'العرض الحالي',
-    initialViewCurrentHint:
-      'الحفاظ على مركز العرض ومستوى التكبير الحالي',
+    initialViewCurrentHint: 'الحفاظ على مركز العرض ومستوى التكبير الحالي',
 
     viewerMode: 'وضع العارض',
     viewerModeView: 'عرض',
-    viewerModeViewHint:
-      'التحريك والتكبير والتحكم في الطبقات فقط',
+    viewerModeViewHint: 'التحريك والتكبير والتحكم في الطبقات فقط',
 
     viewerModeMeasure: 'قياس ومراجعة',
     viewerModeMeasureHint:
@@ -136,8 +132,7 @@ export default {
     expiryCustomPlaceholder: 'اختر تاريخ ووقت الانتهاء',
     expiryCustomRequired: 'يرجى اختيار تاريخ ووقت انتهاء مخصص.',
     expiryCustomPast: 'يجب أن يكون وقت الانتهاء المخصص في المستقبل.',
-    expiryHint:
-      'بعد انتهاء مدة الصلاحية، لن يمكن فتح ملف HTML المُصدَّر.',
+    expiryHint: 'بعد انتهاء مدة الصلاحية، لن يمكن فتح ملف HTML المُصدَّر.',
     passwordSection: 'كلمة المرور',
     passwordPlaceholder: 'اتركه فارغًا لعدم تعيين كلمة مرور',
     passwordHint:
@@ -181,13 +176,11 @@ export default {
     modeAdd: 'إضافة إلى مجموعة التحديد الحالية',
     modeRemove: 'استبعاد من مجموعة التحديد الحالية',
 
-    previewResult:
-      'العناصر المطابقة: {count} / إجمالي العناصر: {total}',
+    previewResult: 'العناصر المطابقة: {count} / إجمالي العناصر: {total}',
 
     valueRequired: 'يرجى تحديد قيمة للتصفية',
 
-    selectionResult:
-      'تم العثور على {count} عنصر وتطبيقها على التحديد'
+    selectionResult: 'تم العثور على {count} عنصر وتطبيقها على التحديد'
   },
 
   textStyleDlg: {
@@ -234,6 +227,40 @@ export default {
     setCurrentDone: 'تم تعيين نمط النص الحالي إلى "{name}".'
   },
 
+  plotDlg: {
+    title: 'طباعة',
+    layout: 'التخطيط:',
+    model: 'النموذج',
+    paperSize: 'حجم الورق:',
+    paperFromLayout: 'من إعدادات صفحة التخطيط',
+    paperCustom: 'مخصص',
+    customSize: 'حجم مخصص:',
+    orientation: 'الاتجاه:',
+    portrait: 'عمودي',
+    landscape: 'أفقي',
+    plotArea: 'منطقة الطباعة:',
+    areaExtents: 'المدى',
+    areaLayout: 'التخطيط',
+    scale: 'المقياس:',
+    scaleFit: 'ملاءمة الورق',
+    scaleCustom: 'مخصص',
+    plotStyle: 'نمط الطباعة:',
+    styleAsIs: 'كما هو معروض',
+    styleMono: 'أحادي اللون',
+    styleGray: 'تدرج رمادي',
+    margins: 'الهوامش (مم):',
+    centerPlot: 'توسيط على الورق',
+    viewportSection: 'منافذ العرض',
+    drawViewportContent: 'رسم النموذج عبر منافذ العرض',
+    plotViewportBorders: 'طباعة حدود منافذ العرض',
+    preview: 'معاينة',
+    previewRefresh: 'معاينة',
+    previewEmpty: 'انقر على معاينة لعرض الورقة.',
+    plotFailed: 'فشلت الطباعة',
+    unitMm: 'مم',
+    timesSign: '×',
+    ratioSeparator: ':'
+  },
   attEditDlg: {
     ...enDialog.attEditDlg,
 

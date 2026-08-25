@@ -6,13 +6,15 @@ import {
 
 import packageJson from '../package.json'
 import { AcApConvertToPdfCmd } from './AcApConvertToPdfCmd'
+import { AcApConvertToPlotPdfCmd } from './AcApConvertToPlotPdfCmd'
 import { AcApImportPdfCmd } from './AcApImportPdfCmd'
 
 /**
  * PDF export/import plugin for cad-simple-viewer.
  *
- * Registers `cpdf` and `ipdf` commands when loaded. Register this plugin
- * lazily via {@link registerLazyPdfPlugin} so PDF libraries are fetched on demand.
+ * Registers `cpdf`, `-plot` and `ipdf` commands when loaded. Register this
+ * plugin lazily via {@link registerLazyPdfPlugin} so PDF libraries are
+ * fetched on demand.
  */
 export class AcApPdfPlugin implements AcApPlugin {
   /** @inheritdoc */
@@ -20,13 +22,13 @@ export class AcApPdfPlugin implements AcApPlugin {
   /** @inheritdoc */
   version = packageJson.version
   /** @inheritdoc */
-  description = 'PDF export (cpdf) and import (ipdf) commands'
+  description = 'PDF export (cpdf), plotting (-plot) and import (ipdf) commands'
 
   /** Commands registered in {@link onLoad} for cleanup in {@link onUnload}. */
   private registeredCommands: Array<{ group: string; name: string }> = []
 
   /**
-   * Registers `cpdf` and `ipdf` system commands.
+   * Registers `cpdf`, `-plot` and `ipdf` system commands.
    *
    * @param _context - Application context (unused)
    * @param commandManager - Command stack used to register PDF commands
@@ -34,9 +36,16 @@ export class AcApPdfPlugin implements AcApPlugin {
   onLoad(_context: AcApContext, commandManager: AcEdCommandStack): void {
     const group = AcEdCommandStack.SYSTEMT_COMMAND_GROUP_NAME
     commandManager.addCommand(group, 'cpdf', 'cpdf', new AcApConvertToPdfCmd())
+    commandManager.addCommand(
+      group,
+      '-plot',
+      '-plot',
+      new AcApConvertToPlotPdfCmd()
+    )
     commandManager.addCommand(group, 'ipdf', 'ipdf', new AcApImportPdfCmd())
     this.registeredCommands.push(
       { group, name: 'cpdf' },
+      { group, name: '-plot' },
       { group, name: 'ipdf' }
     )
   }

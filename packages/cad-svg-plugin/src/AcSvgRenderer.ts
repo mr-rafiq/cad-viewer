@@ -297,6 +297,32 @@ export class AcSvgRenderer implements AcGiRenderer<AcSvgEntity> {
   }
 
   /**
+   * Exports raw SVG element markup for all accumulated entities without the
+   * enclosing `<svg>` wrapper, background rect, or Y-flip group.
+   *
+   * Elements are emitted in drawing coordinates (Y up), so consumers that
+   * compose sheets (for example the plot/PDF engine) must apply their own
+   * `matrix(f,0,0,-f,tx,ty)` transform to map drawing space onto a
+   * top-down sheet.
+   *
+   * @returns The joined element markup and the union bounding box (in
+   * drawing coordinates). The box is empty when nothing was drawable.
+   */
+  exportElements(): { markup: string; bbox: AcGeBox2d } {
+    const parts: string[] = []
+    const bbox = new AcGeBox2d()
+    for (const entity of this._entities) {
+      const svg = entity.renderSvg()
+      if (svg) {
+        parts.push(svg)
+        bbox.union(entity.box)
+      }
+    }
+    this._bbox = bbox
+    return { markup: parts.join('\n'), bbox }
+  }
+
+  /**
    * Exports accumulated SVG markup. Awaits any pending raster images first.
    */
   async exportAsync(): Promise<string> {

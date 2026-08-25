@@ -5,6 +5,7 @@
  */
 
 export * from './AcSvgRenderer'
+export { AcSvgExportUtil } from './AcSvgExportUtil'
 export { AcApConvertToSvgCmd } from './AcApConvertToSvgCmd'
 export { AcApSvgConvertor } from './AcApSvgConvertor'
 export { createSvgPlugin } from './createSvgPlugin'
