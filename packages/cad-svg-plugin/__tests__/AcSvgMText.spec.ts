@@ -49,6 +49,116 @@ function createTraits(): AcGiSubEntityTraits {
 }
 
 describe('buildSvgMText', () => {
+  function build(text: string, width?: number) {
+    return buildSvgMText(
+      {
+        text,
+        height: 2.5,
+        width,
+        position: { x: 0, y: 0, z: 0 },
+        rotation: 0
+      } as never,
+      { font: 'Arial' } as never,
+      createTraits(),
+      ctx
+    )
+  }
+
+  function tspans(markup: string) {
+    return [...markup.matchAll(/<tspan[^>]*>([^<]*)<\/tspan>/g)].map(m => m[1])
+  }
+
+  it('lays out a single-line TEXT entity horizontally', () => {
+    // AcDbText.subWorldDraw reports drawingDirection BOTTOM_TO_TOP to mean
+    // "lines stack downwards". Treating that as vertical text emitted one
+    // tspan per glyph and stood every TEXT entity on end.
+    const { localSvg } = buildSvgMText(
+      {
+        text: 'Material:',
+        height: 2.75,
+        width: Infinity,
+        position: { x: 0, y: 0, z: 0 },
+        rotation: 0,
+        drawingDirection: AcGiMTextFlowDirection.BOTTOM_TO_TOP
+      } as never,
+      { font: 'Arial', standardFlag: 0 } as never,
+      createTraits(),
+      ctx
+    )
+    expect(tspans(localSvg)).toEqual(['Material:'])
+  })
+
+  it('still stacks glyphs for a vertical text style', () => {
+    // Vertical layout comes from DXF STYLE group 70 bit 4, not group 72.
+    const { localSvg } = buildSvgMText(
+      {
+        text: 'AB',
+        height: 2.75,
+        width: Infinity,
+        position: { x: 0, y: 0, z: 0 },
+        rotation: 0,
+        drawingDirection: AcGiMTextFlowDirection.BOTTOM_TO_TOP
+      } as never,
+      { font: 'Arial', standardFlag: 4 } as never,
+      createTraits(),
+      ctx
+    )
+    expect(tspans(localSvg)).toEqual(['A', 'B'])
+  })
+
+  it('keeps a word that fits on one line in a single tspan', () => {
+    // A defined MTEXT reference width used to split every word into one
+    // tspan per glyph; continuation tspans carried no position, so anything
+    // not inheriting the text advance stacked the characters vertically.
+    expect(tspans(build('KUNDE', 40).localSvg)).toEqual(['KUNDE'])
+  })
+
+  it('lays out a bounded word exactly like an unbounded one', () => {
+    expect(build('KUNDE', 40).localSvg).toBe(build('KUNDE').localSvg)
+  })
+
+  it('wraps between words rather than inside them', () => {
+    expect(tspans(build('Werkauftrag 7847.01.02', 40).localSvg)).toEqual([
+      'Werkauftrag',
+      '7847.01.02'
+    ])
+  })
+
+  it('breaks mid-word only when the word cannot fit the line', () => {
+    expect(tspans(build('KUNDE', 4).localSvg)).toEqual([
+      'K',
+      'U',
+      'N',
+      'D',
+      'E'
+    ])
+  })
+
+  it('gives every span an explicit x so text does not rely on flow', () => {
+    // Each tspan carries its own scale(widthFactor,1); consumers that do not
+    // inherit the text position across transformed tspans (svg2pdf among
+    // them) collapse positionless spans onto each other.
+    const markup = build('Werkauftrag 7847.01.02', 40).localSvg
+    const spanTags = markup.match(/<tspan[^>]*>/g) ?? []
+    expect(spanTags.length).toBeGreaterThan(1)
+    for (const tag of spanTags) {
+      expect(tag).toMatch(/\sx="/)
+    }
+  })
+
+  it('undoes the width-factor scale on an explicit x', () => {
+    // x is resolved inside the tspan's own transform, so layout positions
+    // (already width-factor scaled) must be divided by it.
+    const markup = build('Werkauftrag 7847.01.02', 40).localSvg
+    const second = (markup.match(/<tspan[^>]*>/g) ?? [])[1]
+    const scale = Number(/scale\(([\d.]+),1\)/.exec(second)![1])
+    const x = Number(/\sx="([-\d.]+)"/.exec(second)![1])
+    expect(scale).toBeCloseTo(0.85, 5)
+    // Rendered position is x * scale; it must clear the first word.
+    expect(x * scale).toBeGreaterThan(10)
+    expect(x * scale).toBeLessThan(40)
+  })
+
   it('splits paragraphs into tspans', () => {
     const { localSvg } = buildSvgMText(
       {
@@ -247,7 +357,7 @@ describe('buildSvgMText', () => {
     expect(localSvg).toContain('rotate(-90')
   })
 
-  it('lays out bottom-to-top vertical text for TEXT-style flow', () => {
+  it('stacks glyphs downwards for a vertical text style', () => {
     const { localSvg } = buildSvgMText(
       {
         text: 'ABC',
@@ -256,7 +366,7 @@ describe('buildSvgMText', () => {
         position: { x: 0, y: 0, z: 0 },
         drawingDirection: AcGiMTextFlowDirection.BOTTOM_TO_TOP
       } as never,
-      { font: 'Arial' } as never,
+      { font: 'Arial', standardFlag: 4 } as never,
       createTraits(),
       ctx
     )
@@ -266,6 +376,25 @@ describe('buildSvgMText', () => {
     )
     expect(yValues.length).toBeGreaterThan(1)
     expect(yValues[0]).toBeGreaterThan(yValues[yValues.length - 1])
+  })
+
+  it('does not stack glyphs when only the drawing direction is set', () => {
+    // The previous expectation here asserted the opposite and is what let
+    // every AcDbText entity ship rotated onto its side.
+    const { localSvg } = buildSvgMText(
+      {
+        text: 'ABC',
+        height: 10,
+        width: 100,
+        position: { x: 0, y: 0, z: 0 },
+        drawingDirection: AcGiMTextFlowDirection.BOTTOM_TO_TOP
+      } as never,
+      { font: 'Arial', standardFlag: 0 } as never,
+      createTraits(),
+      ctx
+    )
+
+    expect(tspans(localSvg)).toEqual(['ABC'])
   })
 
   it('applies inline color formatting', () => {

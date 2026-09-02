@@ -1,6 +1,7 @@
 import {
   AcCmColor,
   AcCmTransparency,
+  AcDbEntity,
   AcDbRenderingCache,
   AcGeArea2d,
   AcGeBox2d,
@@ -57,6 +58,10 @@ export class AcSvgRenderer implements AcGiRenderer<AcSvgEntity> {
   private _foregroundColor = 0x000000
   private _showLineWeight = false
   private _plotTransparency = true
+  private _resolveLayerLineWeight?: (
+    layerName: string
+  ) => AcGiLineWeight | undefined
+  private _defaultLineWeightMm?: number
   private _pendingImages: Promise<void>[]
 
   constructor() {
@@ -167,6 +172,26 @@ export class AcSvgRenderer implements AcGiRenderer<AcSvgEntity> {
     this._plotTransparency = value
   }
 
+  /**
+   * Looks up a layer's lineweight so `ByLayer` geometry resolves to a real
+   * width. `AcDbEntity.lineWeight` returns the `ByLayer` sentinel rather
+   * than the layer's value, so without this nearly every entity would fall
+   * through to the SVG default width.
+   */
+  set resolveLayerLineWeight(
+    resolver: ((layerName: string) => AcGiLineWeight | undefined) | undefined
+  ) {
+    this._resolveLayerLineWeight = resolver
+  }
+
+  /**
+   * Width in millimeters for geometry whose lineweight resolves to nothing,
+   * mirroring AutoCAD's LWDEFAULT. Leave unset to emit no width at all.
+   */
+  set defaultLineWeightMm(value: number | undefined) {
+    this._defaultLineWeightMm = value
+  }
+
   private get styleContext(): AcSvgStyleContext {
     return {
       ltscale: this._ltscale,
@@ -174,13 +199,41 @@ export class AcSvgRenderer implements AcGiRenderer<AcSvgEntity> {
       backgroundColor: this._currentBackgroundColor,
       foregroundColor: this._foregroundColor,
       showLineWeight: this._showLineWeight,
-      plotTransparency: this._plotTransparency
+      plotTransparency: this._plotTransparency,
+      resolveLayerLineWeight: this._resolveLayerLineWeight,
+      defaultLineWeightMm: this._defaultLineWeightMm
     }
   }
 
   private pushEntity(entity: AcSvgEntity) {
     this._entities.push(entity)
     return entity
+  }
+
+  /**
+   * Draws one top-level database entity and records its graphic result.
+   *
+   * `worldDraw` does not always route its final result back through this
+   * renderer. Block references resolve through the shared
+   * {@link AcDbRenderingCache}, which returns a cached clone this renderer
+   * never saw (cache hit) or a clone of the group it did see (cache miss) —
+   * in both cases the block transform and the attribute children live on
+   * the returned graphic, not on whatever landed in the accumulator. So the
+   * accumulator is rewound to what the entity contributed and the returned
+   * graphic is stored in its place. Every `subWorldDraw` returns the single
+   * graphic covering everything it drew, so nothing is lost by rewinding.
+   *
+   * @param entity - Database entity to draw
+   * @returns The graphic recorded for the entity, if it drew anything
+   */
+  drawEntity(entity: AcDbEntity): AcSvgEntity | undefined {
+    const mark = this._entities.length
+    const drawn = entity.worldDraw(this)
+    this._entities.length = mark
+    if (drawn instanceof AcSvgEntity) {
+      return this.pushEntity(drawn)
+    }
+    return undefined
   }
 
   private removeEntities(entities: AcSvgEntity[]) {

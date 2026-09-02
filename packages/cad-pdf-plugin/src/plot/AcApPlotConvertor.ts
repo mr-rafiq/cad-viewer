@@ -20,7 +20,8 @@ import {
   computeContentTransform,
   computePrintableArea,
   computeScaleFactor,
-  resolveSheetSizeMm
+  resolveSheetSizeMm,
+  scaleStrokeWidths
 } from './AcApPlotMath'
 import type { AcApPlotOptions } from './AcApPlotOptions'
 import {
@@ -38,6 +39,12 @@ interface RenderPassResult {
 }
 
 const EMPTY_BOX: ContentBox = { minX: 0, minY: 0, maxX: 0, maxY: 0 }
+
+/**
+ * Width in millimeters for geometry whose lineweight resolves to neither an
+ * entity nor a layer value. Matches AutoCAD's LWDEFAULT.
+ */
+const DEFAULT_LINE_WEIGHT_MM = 0.25
 
 /**
  * Minimal document source required by the plot engine. Satisfied by
@@ -88,6 +95,25 @@ export class AcApPlotConvertor {
     source: AcApPlotSource,
     options: AcApPlotOptions
   ): Promise<string> {
+    // AcDbRenderingCache is a process-wide singleton keyed by block name and
+    // colour only, so it still holds the on-screen Three.js templates. Block
+    // references would hit those entries and never reach this SVG renderer,
+    // silently dropping every INSERT (title blocks, section marks, symbols)
+    // from the sheet. Clearing also discards templates built for a previous
+    // preview whose plot style or transparency setting has since changed.
+    AcSvgRenderer.prepareExport()
+    try {
+      return this.buildSheetSvg(source, options)
+    } finally {
+      // Leave nothing SVG-shaped behind for the canvas renderer to reuse.
+      AcSvgRenderer.prepareExport()
+    }
+  }
+
+  private buildSheetSvg(
+    source: AcApPlotSource,
+    options: AcApPlotOptions
+  ): string {
     const db = source.doc.database
     const layout = this.resolveLayout(db.objects.layout, options)
 
@@ -170,7 +196,9 @@ export class AcApPlotConvertor {
         offsetX,
         offsetY
       )
-      contentMarkup = paperPass.markup || null
+      contentMarkup = paperPass.markup
+        ? scaleStrokeWidths(paperPass.markup, factor)
+        : null
       if (windowBox) {
         contentClipRect = this.windowClipRect(windowBox, contentTransform)
       }
@@ -188,7 +216,9 @@ export class AcApPlotConvertor {
         offsetX,
         offsetY
       )
-      contentMarkup = modelPass.markup || null
+      contentMarkup = modelPass.markup
+        ? scaleStrokeWidths(modelPass.markup, factor)
+        : null
       if (windowBox) {
         contentClipRect = this.windowClipRect(windowBox, contentTransform)
       }
@@ -236,7 +266,14 @@ export class AcApPlotConvertor {
     const db = source.doc.database
     renderer.ltscale = db.ltscale
     renderer.celtscale = db.celtscale
-    renderer.showLineWeight = !!db.lwdisplay
+    // LWDISPLAY only governs the on-screen preview in AutoCAD; a plot always
+    // renders real lineweights. Leaving it off here produced 1-unit hairline
+    // strokes (a full millimeter on the sheet) and made AcCtbSvgRenderer skip
+    // the CTB pen widths entirely.
+    renderer.showLineWeight = true
+    renderer.resolveLayerLineWeight = layerName =>
+      db.tables.layerTable.getAt(layerName)?.lineWeight
+    renderer.defaultLineWeightMm = DEFAULT_LINE_WEIGHT_MM
     renderer.setFontMapping(AcApSettingManager.instance.fontMapping)
     // Plots always use white paper with black foreground so ACI 7
     // resolves correctly regardless of canvas theme.
@@ -270,7 +307,7 @@ export class AcApPlotConvertor {
     const entities =
       source.doc.database.tables.blockTable.modelSpace.newIterator()
     for (const entity of entities) {
-      entity.worldDraw(renderer)
+      renderer.drawEntity(entity)
     }
     return this.splitExport(renderer)
   }
@@ -296,7 +333,7 @@ export class AcApPlotConvertor {
     const renderer = this.createRenderer(source, ctbTable, plotTransparency)
     for (const entity of record.newIterator()) {
       if (skip(entity)) continue
-      entity.worldDraw(renderer)
+      renderer.drawEntity(entity)
     }
     return this.splitExport(renderer)
   }
@@ -455,6 +492,8 @@ export class AcApPlotConvertor {
       },
       viewBox: { x: cx - width / 2, y: cy - height / 2, width, height },
       twistAngle: twist,
+      // A viewport scales model units by its own zoom (paper units per model
+      // unit); mapCompositionsToSheet then applies the sheet scale on top.
       markup: modelPass.markup
     }
   }
@@ -486,13 +525,22 @@ export class AcApPlotConvertor {
     transform: PlotTransform
   ) {
     for (const composition of compositions) {
-      const { rect } = composition
-      composition.rect = {
+      const { rect, viewBox } = composition
+      const sheetRect = {
         x: transform.a * rect.x + transform.e,
         y: transform.d * (rect.y + rect.height) + transform.f,
         width: transform.a * rect.width,
         height: -transform.d * rect.height
       }
+      // Model markup is nested in an <svg> that maps viewBox onto the sheet
+      // rectangle, so its own scale is sheet millimeters per model unit.
+      if (composition.markup && viewBox.width > 0) {
+        composition.markup = scaleStrokeWidths(
+          composition.markup,
+          sheetRect.width / viewBox.width
+        )
+      }
+      composition.rect = sheetRect
     }
   }
 

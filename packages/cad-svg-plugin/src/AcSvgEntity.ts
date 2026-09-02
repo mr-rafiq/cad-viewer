@@ -18,6 +18,7 @@ export class AcSvgEntity implements AcGiEntity {
   private _userData: object
   protected _box: AcGeBox2d
   protected _localSvg: string
+  protected _children: AcSvgEntity[]
   private _matrix?: AcGeMatrix3d
   protected _basePoint?: AcGePoint3d
 
@@ -29,6 +30,7 @@ export class AcSvgEntity implements AcGiEntity {
     this._userData = {}
     this._box = new AcGeBox2d()
     this._localSvg = ''
+    this._children = []
   }
 
   /**
@@ -75,14 +77,25 @@ export class AcSvgEntity implements AcGiEntity {
    * Final SVG fragment with accumulated transforms applied.
    */
   renderSvg(): string {
-    if (!this._localSvg) {
+    const parts: string[] = []
+    if (this._localSvg) {
+      parts.push(this._localSvg)
+    }
+    for (const child of this._children) {
+      const childSvg = child.renderSvg()
+      if (childSvg) {
+        parts.push(childSvg)
+      }
+    }
+    if (parts.length === 0) {
       return ''
     }
+    const inner = parts.join('\n')
     if (!this._matrix) {
-      return this._localSvg
+      return inner
     }
     const transform = AcSvgMatrixUtil.toSvgTransform(this._matrix)
-    return `<g transform="${transform}">\n${this._localSvg}\n</g>`
+    return `<g transform="${transform}">\n${inner}\n</g>`
   }
 
   get objectId() {
@@ -144,11 +157,42 @@ export class AcSvgEntity implements AcGiEntity {
     // Do nothing
   }
 
-  fastDeepClone() {
-    return this
+  /**
+   * Returns an independent copy of this node.
+   *
+   * {@link AcDbRenderingCache} keeps the first draw of a block as a shared
+   * template and hands every later INSERT a clone to place. Returning
+   * `this` made all of them the same object, so each INSERT stacked another
+   * transform onto the one already on the sheet and only one instance
+   * survived. Children are cloned too, so placing one instance cannot move
+   * another.
+   */
+  fastDeepClone(): this {
+    const clone = Object.create(Object.getPrototypeOf(this)) as this
+    Object.assign(clone, this)
+    clone._box = this._box.clone()
+    clone._matrix = this._matrix?.clone()
+    clone._basePoint = this._basePoint
+      ? new AcGePoint3d(this._basePoint)
+      : undefined
+    clone._userData = { ...this._userData }
+    clone._children = this._children.map(child => child.fastDeepClone())
+    return clone
   }
 
-  addChild(_entity: AcGiEntity) {
-    // Do nothing for now
+  /**
+   * Appends a child node, growing this node's bounding box to cover it.
+   *
+   * Block references attach their attribute graphics this way. While this
+   * was a no-op the attributes kept the inverse block transform applied by
+   * {@link AcDbRenderingCache} and were drawn in block-local coordinates
+   * instead of at the insertion point.
+   */
+  addChild(entity: AcGiEntity) {
+    if (!(entity instanceof AcSvgEntity)) {
+      return
+    }
+    this._children.push(entity)
+    this._box.union(entity.box)
   }
 }

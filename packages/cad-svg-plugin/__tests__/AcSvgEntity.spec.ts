@@ -92,6 +92,50 @@ describe('AcSvgEntity transforms', () => {
     expect(exported).toContain('matrix(')
   })
 
+  it('clones independently so repeated block instances do not share a transform', () => {
+    // AcDbRenderingCache places every INSERT after the first by cloning the
+    // cached template. While fastDeepClone returned `this`, each placement
+    // stacked another transform onto the single shared node.
+    const template = new AcSvgGroup([
+      new AcSvgLine(
+        [
+          { x: 0, y: 0, z: 0 },
+          { x: 5, y: 0, z: 0 }
+        ],
+        defaultTraits(),
+        ctx
+      )
+    ])
+
+    const first = template.fastDeepClone()
+    first.applyMatrix(new AcGeMatrix3d().makeTranslation(100, 0, 0))
+    const second = template.fastDeepClone()
+    second.applyMatrix(new AcGeMatrix3d().makeTranslation(200, 0, 0))
+
+    expect(first).not.toBe(second)
+    expect(first.box.min.x).toBeCloseTo(100)
+    expect(second.box.min.x).toBeCloseTo(200)
+    expect(template.box.min.x).toBeCloseTo(0)
+  })
+
+  it('renders children attached with addChild', () => {
+    const group = new AcSvgGroup([])
+    group.addChild(
+      new AcSvgLine(
+        [
+          { x: 0, y: 0, z: 0 },
+          { x: 5, y: 0, z: 0 }
+        ],
+        defaultTraits(),
+        ctx
+      )
+    )
+
+    expect(group.childCount).toBe(1)
+    expect(group.renderSvg()).toContain('<path ')
+    expect(group.box.max.x).toBeCloseTo(5)
+  })
+
   it('embeds a background rect from currentBackgroundColor', () => {
     const renderer = new AcSvgRenderer()
     renderer.currentBackgroundColor = 0x000000

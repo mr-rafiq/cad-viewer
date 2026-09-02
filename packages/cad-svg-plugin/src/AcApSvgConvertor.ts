@@ -25,7 +25,7 @@ export class AcApSvgConvertor {
     this.configureRenderer(renderer, context)
 
     for (const entity of entities) {
-      entity.worldDraw(renderer)
+      renderer.drawEntity(entity)
     }
 
     const svgContent = await renderer.exportAsync()

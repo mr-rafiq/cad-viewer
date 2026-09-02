@@ -35,7 +35,7 @@ export class AcApPdfConvertor {
     this.configureRenderer(renderer, context)
 
     for (const entity of entities) {
-      entity.worldDraw(renderer)
+      renderer.drawEntity(entity)
     }
     return renderer.exportAsync()
   }

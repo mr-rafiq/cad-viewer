@@ -111,19 +111,31 @@ function resolveWrapWidth(mtext: AcGiMTextData): number | null {
   return mtext.width
 }
 
-function resolveFlowMode(drawingDirection?: AcGiMTextFlowDirection): FlowMode {
-  switch (drawingDirection) {
-    case AcGiMTextFlowDirection.RIGHT_TO_LEFT:
-      return FlowMode.HorizontalRtl
-    case AcGiMTextFlowDirection.TOP_TO_BOTTOM:
-      return FlowMode.VerticalTtb
-    case AcGiMTextFlowDirection.BOTTOM_TO_TOP:
-      return FlowMode.VerticalBtt
-    case AcGiMTextFlowDirection.LEFT_TO_RIGHT:
-    case AcGiMTextFlowDirection.BY_STYLE:
-    default:
-      return FlowMode.HorizontalLtr
+/** DXF STYLE group-70 bit 4: the style stacks glyphs vertically. */
+const TEXT_STYLE_VERTICAL_FLAG = 4
+
+/**
+ * Resolves how glyphs and lines advance.
+ *
+ * Vertical layout is a property of the *text style* (DXF STYLE group 70,
+ * bit 4), not of the drawing direction. MTEXT group 72 only says which way
+ * successive lines advance, and `AcDbText.subWorldDraw` reports
+ * `BOTTOM_TO_TOP` for every single-line TEXT entity to mean "lines stack
+ * downwards". Reading that as vertical text laid every TEXT entity out one
+ * glyph per line, which stacked whole title blocks on end.
+ */
+function resolveFlowMode(
+  drawingDirection: AcGiMTextFlowDirection | undefined,
+  style: AcGiTextStyle
+): FlowMode {
+  if (((style.standardFlag ?? 0) & TEXT_STYLE_VERTICAL_FLAG) !== 0) {
+    return drawingDirection === AcGiMTextFlowDirection.TOP_TO_BOTTOM
+      ? FlowMode.VerticalTtb
+      : FlowMode.VerticalBtt
   }
+  return drawingDirection === AcGiMTextFlowDirection.RIGHT_TO_LEFT
+    ? FlowMode.HorizontalRtl
+    : FlowMode.HorizontalLtr
 }
 
 function resolveRotation(mtext: AcGiMTextData): number {
@@ -232,7 +244,7 @@ export function buildSvgMText(
   const baseHeight = height
   const lineAdvance = resolveLineAdvance(baseHeight, mtext)
   const wrapWidth = resolveWrapWidth(mtext)
-  const flowMode = resolveFlowMode(mtext.drawingDirection)
+  const flowMode = resolveFlowMode(mtext.drawingDirection, style)
   const defaultFont = resolveSvgFontFamily(
     style.extendedFont || style.font,
     'sans-serif'
@@ -366,31 +378,22 @@ class MTextSvgLayout {
     let isFirstLine = true
 
     for (const line of this.lines) {
-      let lineStartX: number | undefined
-      let expectedX: number | undefined
+      let isLineStart = true
 
       for (const span of line.spans) {
         const attrs = this.tspanAttributes(span.tokenCtx, span.fontSize)
-        const isLineStart = lineStartX === undefined
+        // Layout runs in final (width-factor applied) space, but a tspan's
+        // own `scale(widthFactor,1)` transform also scales its `x`. Undo the
+        // scale so an explicit position lands where layout put it.
+        const scale = this.resolveWidthFactor(span.tokenCtx)
+        attrs.x = String(scale > 0 ? span.x / scale : span.x)
 
         if (this.isVertical()) {
-          attrs.x = String(span.x)
           attrs.y = String(span.y)
         } else if (isLineStart) {
-          lineStartX = span.x
-          attrs.x = String(span.x)
           attrs.dy = isFirstLine ? '0' : String(this.lineAdvance)
           isFirstLine = false
-          expectedX =
-            span.x + this.measureText(span.text, span.fontSize, span.tokenCtx)
-        } else if (expectedX != null && Math.abs(span.x - expectedX) > 1e-6) {
-          attrs.x = String(span.x)
-          expectedX =
-            span.x + this.measureText(span.text, span.fontSize, span.tokenCtx)
-        } else {
-          expectedX =
-            (expectedX ?? span.x) +
-            this.measureText(span.text, span.fontSize, span.tokenCtx)
+          isLineStart = false
         }
 
         markup += AcSvgStyleUtil.tag('tspan', attrs, escapeXml(span.text))
@@ -600,6 +603,17 @@ class MTextSvgLayout {
       this.penOffset(tokenCtx) + wordWidth > this.maxLineWidth(tokenCtx)
     ) {
       this.wrapLine(tokenCtx)
+    }
+
+    // The word now starts a line (or already fitted). Emit it as one run
+    // unless it is genuinely wider than the line and has to be broken
+    // mid-word: splitting every word into per-character runs produced one
+    // <tspan> per glyph, and continuation tspans carry no explicit position,
+    // so any consumer that does not inherit the text advance across
+    // transformed tspans stacked the characters on top of each other.
+    if (wordWidth <= this.maxLineWidth(tokenCtx)) {
+      this.emitTextRun(value, tokenCtx)
+      return
     }
 
     for (const char of value) {

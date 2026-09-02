@@ -20,9 +20,43 @@ export interface AcSvgStyleContext {
    * drawn fully opaque (AutoCAD "Plot transparency" off). Defaults to on.
    */
   plotTransparency?: boolean
+  /**
+   * Resolves a layer's lineweight for entities that carry `ByLayer` (the
+   * overwhelming majority — `AcDbEntity.lineWeight` does not resolve it).
+   * Without this, ByLayer geometry gets no width at all and falls back to
+   * the SVG default of one user unit.
+   */
+  resolveLayerLineWeight?: (layerName: string) => AcGiLineWeight | undefined
+  /**
+   * Fallback stroke width in millimeters when neither the entity nor its
+   * layer names a lineweight, mirroring AutoCAD's LWDEFAULT. Left unset on
+   * screen exports, where an unresolved lineweight emits no width.
+   */
+  defaultLineWeightMm?: number
 }
 
 export type AcSvgPrimitiveKind = 'line' | 'fill' | 'text' | 'point'
+
+/**
+ * Thinnest stroke width in millimeters, used for lineweight 0. AutoCAD
+ * plots 0.00 mm as the thinnest line the device can draw; 0.05 mm is a
+ * conventional hairline that stays visible in a PDF.
+ */
+const MIN_STROKE_WIDTH_MM = 0.05
+
+/**
+ * Valid AutoCAD lineweights in hundredths of a millimeter.
+ *
+ * Anything outside this set is not a real lineweight: negative values are
+ * the ByLayer / ByBlock / Default sentinels, and `AcDbLayerTableRecord`
+ * leaves `lineWeight` at 1 when a DXF layer omits group code 370. Treating
+ * that placeholder as a 0.01 mm pen plotted whole drawings as invisible
+ * hairlines, so unrecognised values fall through to the default instead.
+ */
+const LINE_WEIGHT_STEPS: ReadonlySet<number> = new Set([
+  0, 5, 9, 13, 15, 18, 20, 25, 30, 35, 40, 50, 53, 60, 70, 80, 90, 100, 106,
+  120, 140, 158, 200, 211
+])
 
 /**
  * Converts entity traits and export context into SVG presentation attributes.
@@ -69,7 +103,7 @@ export class AcSvgStyleUtil {
       attrs['stroke-width'] = '1'
       attrs['vector-effect'] = 'non-scaling-stroke'
     } else {
-      const width = this.resolveStrokeWidth(traits.lineWeight)
+      const width = this.resolveStrokeWidth(traits, ctx)
       if (width != null) {
         attrs['stroke-width'] = String(width)
       }
@@ -160,12 +194,33 @@ export class AcSvgStyleUtil {
     return !style.definitionLines || style.definitionLines.length === 0
   }
 
-  private static resolveStrokeWidth(lineWeight: AcGiLineWeight): number | null {
-    if (lineWeight < 0) {
+  /**
+   * Resolves an entity's plotted stroke width.
+   *
+   * AutoCAD resolves a lineweight as entity -> layer -> LWDEFAULT. Negative
+   * values are the `ByLayer` / `ByBlock` / `Default` sentinels, not widths,
+   * so they are looked up rather than used directly.
+   *
+   * @returns Width in millimeters, or `null` when nothing resolves and no
+   *   default was supplied. Consumers that place the markup inside a scaling
+   *   group must rescale it (see `scaleStrokeWidths` in the plot engine).
+   */
+  private static resolveStrokeWidth(
+    traits: AcGiSubEntityTraits,
+    ctx: AcSvgStyleContext
+  ): number | null {
+    // AutoCAD lineweights are in hundredths of a millimeter.
+    if (LINE_WEIGHT_STEPS.has(traits.lineWeight)) {
+      return Math.max(MIN_STROKE_WIDTH_MM, traits.lineWeight / 100)
+    }
+    const layerWeight = ctx.resolveLayerLineWeight?.(traits.layer)
+    if (layerWeight != null && LINE_WEIGHT_STEPS.has(layerWeight)) {
+      return Math.max(MIN_STROKE_WIDTH_MM, layerWeight / 100)
+    }
+    if (ctx.defaultLineWeightMm == null) {
       return null
     }
-    // AutoCAD lineweights are in 0.01 mm; drawings are typically model units in mm.
-    return Math.max(0.01, lineWeight / 100)
+    return Math.max(MIN_STROKE_WIDTH_MM, ctx.defaultLineWeightMm)
   }
 
   private static resolveOpacity(
@@ -175,11 +230,21 @@ export class AcSvgStyleUtil {
     if (ctx.plotTransparency === false) {
       return null
     }
-    const alpha = traits.transparency?.alpha
+    const transparency = traits.transparency
+    // Only an explicit ByAlpha value carries a meaningful alpha. For
+    // ByLayer / ByBlock the alpha field holds the raw low byte of DXF group
+    // code 440 (0 for the ByLayer encoding 0x01000000), which would erase
+    // the geometry; those entities plot opaque instead.
+    if (!transparency || !transparency.isByAlpha) {
+      return null
+    }
+    const alpha = transparency.alpha
     if (alpha == null || Number.isNaN(alpha)) {
       return null
     }
-    return Math.min(1, Math.max(0, alpha))
+    // AcCmTransparency alpha is 0-255 (0 = clear, 255 = opaque); SVG
+    // opacity is 0-1.
+    return Math.min(1, Math.max(0, alpha / 255))
   }
 
   private static strokeDasharray(

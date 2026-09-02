@@ -45,6 +45,36 @@ export interface PlotTransform {
 }
 
 /**
+ * Rescales `stroke-width` attributes from millimeters into the coordinate
+ * system of the group the markup is placed in.
+ *
+ * {@link AcSvgStyleUtil} emits lineweights as physical millimeters, but plot
+ * markup is drawn in drawing units inside a group that scales those units
+ * onto the sheet, so every stroke would otherwise be multiplied by that
+ * scale. The sheet scale is only known after the render pass has produced a
+ * bounding box, hence the rescale happens here rather than at draw time.
+ *
+ * @param markup - Element markup in drawing coordinates
+ * @param mmPerUnit - Sheet millimeters per drawing unit (the plot scale)
+ * @returns The markup with stroke widths expressed in drawing units
+ */
+export function scaleStrokeWidths(markup: string, mmPerUnit: number): string {
+  if (!markup || !Number.isFinite(mmPerUnit) || mmPerUnit <= 0) {
+    return markup
+  }
+  return markup.replace(
+    /stroke-width="([0-9.eE+-]+)"/g,
+    (match, value: string) => {
+      const widthMm = Number(value)
+      if (!Number.isFinite(widthMm)) {
+        return match
+      }
+      return `stroke-width="${Math.round((widthMm / mmPerUnit) * 1e6) / 1e6}"`
+    }
+  )
+}
+
+/**
  * Resolves the sheet dimensions in millimeters for the given options.
  *
  * Landscape orientation swaps the portrait media dimensions. When the key

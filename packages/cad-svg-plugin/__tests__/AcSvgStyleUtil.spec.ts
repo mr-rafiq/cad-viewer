@@ -50,6 +50,38 @@ describe('AcSvgStyleUtil', () => {
     expect(AcSvgStyleUtil.rgbToHex(0xff8040)).toBe('#ff8040')
   })
 
+  it('keeps ByLayer transparency opaque', () => {
+    // DXF group code 440 for ByLayer is 0x01000000: the alpha byte is 0,
+    // which used to be emitted verbatim as opacity and erased the entity.
+    const attrs = AcSvgStyleUtil.strokeAttributes(
+      createTraits({
+        transparency: AcCmTransparency.deserialize(0x01000000)
+      }),
+      ctx
+    )
+    expect(attrs['stroke-opacity']).toBeUndefined()
+  })
+
+  it('scales a ByAlpha value from 0-255 onto SVG opacity', () => {
+    const transparency = new AcCmTransparency()
+    transparency.percentage = 50
+    const attrs = AcSvgStyleUtil.strokeAttributes(
+      createTraits({ transparency }),
+      ctx
+    )
+    expect(Number(attrs['stroke-opacity'])).toBeCloseTo(0.5, 2)
+  })
+
+  it('drops transparency when plot transparency is off', () => {
+    const transparency = new AcCmTransparency()
+    transparency.percentage = 50
+    const attrs = AcSvgStyleUtil.strokeAttributes(
+      createTraits({ transparency }),
+      { ...ctx, plotTransparency: false }
+    )
+    expect(attrs['stroke-opacity']).toBeUndefined()
+  })
+
   it('applies entity stroke colour from traits', () => {
     const attrs = AcSvgStyleUtil.strokeAttributes(createTraits(), ctx)
     expect(attrs.stroke).toBe('#ff0000')
@@ -95,6 +127,60 @@ describe('AcSvgStyleUtil', () => {
     })
     expect(attrs['stroke-width']).toBe('0.13')
     expect(attrs['vector-effect']).toBeUndefined()
+  })
+
+  it('resolves a ByLayer lineweight from the layer', () => {
+    const attrs = AcSvgStyleUtil.strokeAttributes(
+      createTraits({ lineWeight: AcGiLineWeight.ByLayer, layer: 'Frame' }),
+      {
+        ...ctx,
+        showLineWeight: true,
+        resolveLayerLineWeight: name =>
+          name === 'Frame' ? AcGiLineWeight.LineWeight050 : undefined
+      }
+    )
+    expect(attrs['stroke-width']).toBe('0.5')
+  })
+
+  it('falls back to the default lineweight when nothing resolves', () => {
+    const attrs = AcSvgStyleUtil.strokeAttributes(
+      createTraits({ lineWeight: AcGiLineWeight.ByLayer }),
+      { ...ctx, showLineWeight: true, defaultLineWeightMm: 0.25 }
+    )
+    expect(attrs['stroke-width']).toBe('0.25')
+  })
+
+  it('never leaves an unresolved lineweight to the SVG default width', () => {
+    // Without a default the attribute is omitted, which on a millimeter
+    // sheet would inherit a one-unit (1 mm) stroke.
+    const withDefault = AcSvgStyleUtil.strokeAttributes(
+      createTraits({ lineWeight: AcGiLineWeight.ByBlock }),
+      { ...ctx, showLineWeight: true, defaultLineWeightMm: 0.25 }
+    )
+    expect(Number(withDefault['stroke-width'])).toBeLessThan(1)
+  })
+
+  it('plots lineweight 0 as the thinnest available hairline', () => {
+    const attrs = AcSvgStyleUtil.strokeAttributes(
+      createTraits({ lineWeight: AcGiLineWeight.LineWeight000 }),
+      { ...ctx, showLineWeight: true, defaultLineWeightMm: 0.25 }
+    )
+    expect(attrs['stroke-width']).toBe('0.05')
+  })
+
+  it('ignores a layer lineweight that is not a real AutoCAD step', () => {
+    // AcDbLayerTableRecord leaves lineWeight at 1 when the DXF layer omits
+    // group code 370; reading that as 0.01 mm plotted invisible hairlines.
+    const attrs = AcSvgStyleUtil.strokeAttributes(
+      createTraits({ lineWeight: AcGiLineWeight.ByLayer, layer: 'PLATE' }),
+      {
+        ...ctx,
+        showLineWeight: true,
+        resolveLayerLineWeight: () => 1 as AcGiLineWeight,
+        defaultLineWeightMm: 0.25
+      }
+    )
+    expect(attrs['stroke-width']).toBe('0.25')
   })
 
   it('builds stroke-dasharray from linetype pattern', () => {
