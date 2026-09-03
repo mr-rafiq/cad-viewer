@@ -485,7 +485,7 @@ const form = reactive<PlotForm>({
   paperSizeKey: 'ISO_A4',
   customPaperWidth: 210,
   customPaperHeight: 297,
-  orientation: 'landscape',
+  orientation: 'portrait',
   plotArea: 'extents',
   scaleMode: 'fit',
   scaleNumerator: 1,
@@ -495,7 +495,7 @@ const form = reactive<PlotForm>({
   centerPlot: true,
   plotOffsetX: 0,
   plotOffsetY: 0,
-  plotTransparency: true,
+  plotTransparency: false,
   drawViewportContent: true,
   plotViewportBorders: false
 })
@@ -520,7 +520,7 @@ async function loadCatalog() {
 function resetForm() {
   form.layoutName = ''
   form.paperSizeKey = 'ISO_A4'
-  form.orientation = 'landscape'
+  form.orientation = 'portrait'
   form.plotArea = 'extents'
   form.scaleMode = 'fit'
   form.scaleNumerator = 1
@@ -530,7 +530,7 @@ function resetForm() {
   form.centerPlot = true
   form.plotOffsetX = 0
   form.plotOffsetY = 0
-  form.plotTransparency = true
+  form.plotTransparency = false
   form.drawViewportContent = true
   form.plotViewportBorders = false
   plotWindow.value = null

@@ -142,7 +142,9 @@ export class AcApPlotConvertor {
       layout?.plotPaperSize.y
     )
     const printable = computePrintableArea(sheet, effectiveOptions.marginMm)
-    const plotTransparency = effectiveOptions.plotTransparency !== false
+    // Opt-in: transparency decoded from DWG/DXF is unreliable and often
+    // collapses entities to opacity 0, so honor it only when explicitly on.
+    const plotTransparency = effectiveOptions.plotTransparency === true
 
     let contentMarkup: string | null = null
     let contentTransform: PlotTransform | null = null

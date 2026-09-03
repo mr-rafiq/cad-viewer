@@ -76,8 +76,10 @@ export interface AcApPlotOptions {
   /** Vertical plot offset in millimeters, positive = up (ignored when `centerPlot`). */
   plotOffsetY?: number
   /**
-   * Plots object transparency. When `false`, geometry is plotted fully
-   * opaque (AutoCAD's default "Plot transparency" off). Defaults to `true`.
+   * Plots object transparency. When `false` (the default, matching AutoCAD's
+   * "Plot transparency" off), geometry is plotted fully opaque. Transparency
+   * decoded from DWG/DXF is unreliable enough that honoring it routinely
+   * drops entities to `opacity: 0`, so it is opt-in.
    */
   plotTransparency?: boolean
   /**
@@ -93,7 +95,7 @@ export interface AcApPlotOptions {
 export const DEFAULT_PLOT_OPTIONS: AcApPlotOptions = {
   layoutName: undefined,
   paperSizeKey: 'ISO_A4',
-  orientation: 'landscape',
+  orientation: 'portrait',
   plotArea: 'extents',
   scaleMode: 'fit',
   scaleNumerator: 1,
@@ -103,7 +105,7 @@ export const DEFAULT_PLOT_OPTIONS: AcApPlotOptions = {
   centerPlot: true,
   plotOffsetX: 0,
   plotOffsetY: 0,
-  plotTransparency: true,
+  plotTransparency: false,
   drawViewportContent: true,
   plotViewportBorders: false
 }

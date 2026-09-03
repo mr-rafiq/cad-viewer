@@ -54,6 +54,13 @@ export interface PlotTransform {
  * scale. The sheet scale is only known after the render pass has produced a
  * bounding box, hence the rescale happens here rather than at draw time.
  *
+ * Block references wrap their geometry in a scaled `<g transform="matrix(…)">`,
+ * and SVG multiplies `stroke-width` by *every* enclosing transform. Without
+ * compensation a 0.25 mm lineweight inside a block inserted at scale 3 plots
+ * at 0.75 mm. AutoCAD lineweights are scale-invariant, so this walk tracks
+ * the cumulative scale of the nested groups each stroke sits in and divides
+ * it out as well.
+ *
  * @param markup - Element markup in drawing coordinates
  * @param mmPerUnit - Sheet millimeters per drawing unit (the plot scale)
  * @returns The markup with stroke widths expressed in drawing units
@@ -62,16 +69,56 @@ export function scaleStrokeWidths(markup: string, mmPerUnit: number): string {
   if (!markup || !Number.isFinite(mmPerUnit) || mmPerUnit <= 0) {
     return markup
   }
-  return markup.replace(
-    /stroke-width="([0-9.eE+-]+)"/g,
-    (match, value: string) => {
-      const widthMm = Number(value)
-      if (!Number.isFinite(widthMm)) {
-        return match
+  const token = /<g\b[^>]*>|<\/g>|stroke-width="([0-9.eE+-]+)"/g
+  const groupScales: number[] = []
+  let cumulative = mmPerUnit
+  let out = ''
+  let cursor = 0
+  let match: RegExpExecArray | null
+  while ((match = token.exec(markup)) !== null) {
+    out += markup.slice(cursor, match.index)
+    cursor = match.index + match[0].length
+    const text = match[0]
+    if (text === '</g>') {
+      cumulative /= groupScales.pop() ?? 1
+      out += text
+    } else if (text[1] === 'g') {
+      const scale = text.endsWith('/>') ? null : groupTransformScale(text)
+      if (scale != null) {
+        groupScales.push(scale)
+        cumulative *= scale
       }
-      return `stroke-width="${Math.round((widthMm / mmPerUnit) * 1e6) / 1e6}"`
+      out += text
+    } else {
+      const widthMm = Number(match[1])
+      out +=
+        Number.isFinite(widthMm) && cumulative > 0
+          ? `stroke-width="${Math.round((widthMm / cumulative) * 1e6) / 1e6}"`
+          : text
     }
-  )
+  }
+  return out + markup.slice(cursor)
+}
+
+/**
+ * Uniform scale factor of a `<g transform="matrix(a,b,c,d,…)">` opening tag,
+ * taken as `sqrt(|ad - bc|)` (the area scale) so pure rotations and
+ * translations resolve to 1. Returns 1 when no matrix transform is present.
+ */
+function groupTransformScale(openingTag: string): number {
+  const m =
+    /transform="[^"]*\bmatrix\(\s*([-0-9.eE]+)[\s,]+([-0-9.eE]+)[\s,]+([-0-9.eE]+)[\s,]+([-0-9.eE]+)/.exec(
+      openingTag
+    )
+  if (!m) {
+    return 1
+  }
+  const a = Number(m[1])
+  const b = Number(m[2])
+  const c = Number(m[3])
+  const d = Number(m[4])
+  const scale = Math.sqrt(Math.abs(a * d - b * c))
+  return Number.isFinite(scale) && scale > 0 ? scale : 1
 }
 
 /**
