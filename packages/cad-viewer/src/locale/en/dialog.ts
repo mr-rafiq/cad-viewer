@@ -32,7 +32,7 @@ export default {
       dms: 'Deg/Min/Sec',
       gradians: 'Gradians',
       radians: 'Radians',
-      surveyors: "Surveyor's Units"
+      surveyors: 'Surveyor\'s Units'
     },
     insUnits: {
       _0: 'Unitless',
@@ -218,6 +218,9 @@ export default {
     ctbLoaded: 'Loaded plot style table: {name}',
     ctbInvalid: 'Could not read the selected CTB file.',
     margins: 'Margins (mm):',
+    defaultLineWeight: 'Default lineweight:',
+    defaultLineWeightHint:
+      'Width used where the drawing assigns no lineweight. AutoCAD plots these at 0.25 mm; lower it if the sheet reads too heavy.',
     centerPlot: 'Center the plot',
     optionsGroup: 'Plot options',
     plotTransparency: 'Plot transparency',

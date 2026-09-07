@@ -27,6 +27,7 @@ export {
   type PlotTransform
 } from './plot/AcApPlotMath'
 export {
+  DEFAULT_LINE_WEIGHT_MM,
   DEFAULT_PLOT_OPTIONS,
   type AcApPlotArea,
   type AcApPlotOptions,
@@ -46,11 +47,7 @@ export {
   type AcApCtbTable
 } from './plot/AcApCtb'
 export { AcCtbSvgRenderer } from './plot/AcCtbSvgRenderer'
-export {
-  DEFAULT_CTB_BASE64,
-  DEFAULT_CTB_NAME,
-  loadDefaultCtbTable
-} from './plot/AcApDefaultCtb'
+export { DEFAULT_CTB_NAME, loadDefaultCtbTable } from './plot/AcApDefaultCtb'
 export {
   composeSheetSvg,
   toMatrixAttribute,

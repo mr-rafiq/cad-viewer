@@ -69,6 +69,15 @@ export interface AcApPlotOptions {
   ctbTable?: AcApCtbTable
   /** Unprintable margin applied on every sheet edge, in millimeters. */
   marginMm: number
+  /**
+   * Width in millimeters used for geometry whose lineweight resolves to
+   * neither an entity nor a layer value, mirroring AutoCAD's LWDEFAULT.
+   *
+   * Drawings that leave every layer on "Default" plot entirely at this width,
+   * so it decides how heavy the sheet reads. Defaults to AutoCAD's 0.25 mm;
+   * lower it to match a house standard that plots finer.
+   */
+  defaultLineWeightMm?: number
   /** Centers the plotted content inside the printable area. */
   centerPlot: boolean
   /** Horizontal plot offset in millimeters (ignored when `centerPlot`). */
@@ -91,6 +100,12 @@ export interface AcApPlotOptions {
   plotViewportBorders: boolean
 }
 
+/**
+ * Fallback plotted width in millimeters for geometry with no resolvable
+ * lineweight. Matches AutoCAD's LWDEFAULT.
+ */
+export const DEFAULT_LINE_WEIGHT_MM = 0.25
+
 /** Default options used by the headless `-plot` command and the Plot dialog. */
 export const DEFAULT_PLOT_OPTIONS: AcApPlotOptions = {
   layoutName: undefined,
@@ -102,6 +117,7 @@ export const DEFAULT_PLOT_OPTIONS: AcApPlotOptions = {
   scaleDenominator: 1,
   plotStyle: 'monochrome',
   marginMm: 5,
+  defaultLineWeightMm: DEFAULT_LINE_WEIGHT_MM,
   centerPlot: true,
   plotOffsetX: 0,
   plotOffsetY: 0,

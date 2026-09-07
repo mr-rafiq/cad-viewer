@@ -127,6 +127,28 @@
               t('dialog.plotDlg.unitMm')
             }}</span>
           </div>
+
+          <div class="ml-plot-dlg__row">
+            <label class="ml-plot-dlg__label">{{
+              t('dialog.plotDlg.defaultLineWeight')
+            }}</label>
+            <el-input-number
+              v-model="form.defaultLineWeightMm"
+              :min="0.01"
+              :max="2.11"
+              :step="0.01"
+              :precision="2"
+              :controls="false"
+              size="small"
+              class="ml-plot-dlg__number"
+            />
+            <span class="ml-plot-dlg__unit">{{
+              t('dialog.plotDlg.unitMm')
+            }}</span>
+          </div>
+          <div class="ml-plot-dlg__hint">
+            {{ t('dialog.plotDlg.defaultLineWeightHint') }}
+          </div>
         </fieldset>
 
         <fieldset class="ml-plot-dlg__group">
@@ -438,6 +460,14 @@ const visible = computed({
   set: (v: boolean) => emit('update:modelValue', v)
 })
 
+/**
+ * Fallback plotted width in millimeters for geometry whose lineweight
+ * resolves to neither an entity nor a layer value. Mirrors AutoCAD's
+ * LWDEFAULT and the plot engine's own default; kept local so the dialog does
+ * not pull the lazily loaded PDF plugin into the main bundle.
+ */
+const DEFAULT_LINE_WEIGHT_MM = 0.25
+
 const customPaperKey = CUSTOM_PAPER_KEY
 const fromLayoutPaperKey = FROM_LAYOUT_PAPER_KEY
 
@@ -467,6 +497,7 @@ type PlotForm = Required<
     | 'scaleDenominator'
     | 'plotStyle'
     | 'marginMm'
+    | 'defaultLineWeightMm'
     | 'centerPlot'
     | 'plotOffsetX'
     | 'plotOffsetY'
@@ -492,6 +523,7 @@ const form = reactive<PlotForm>({
   scaleDenominator: 1,
   plotStyle: 'ctb',
   marginMm: 5,
+  defaultLineWeightMm: DEFAULT_LINE_WEIGHT_MM,
   centerPlot: true,
   plotOffsetX: 0,
   plotOffsetY: 0,
@@ -527,6 +559,7 @@ function resetForm() {
   form.scaleDenominator = 1
   form.plotStyle = 'ctb'
   form.marginMm = 5
+  form.defaultLineWeightMm = DEFAULT_LINE_WEIGHT_MM
   form.centerPlot = true
   form.plotOffsetX = 0
   form.plotOffsetY = 0
@@ -710,6 +743,7 @@ function buildOptions(): AcApPlotOptions {
     plotStyle: form.plotStyle,
     ctbTable: ctbTable.value ?? undefined,
     marginMm: form.marginMm,
+    defaultLineWeightMm: form.defaultLineWeightMm,
     centerPlot: form.centerPlot,
     plotOffsetX: form.plotOffsetX,
     plotOffsetY: form.plotOffsetY,

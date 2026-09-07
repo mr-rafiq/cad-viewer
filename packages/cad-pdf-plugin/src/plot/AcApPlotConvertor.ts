@@ -23,7 +23,7 @@ import {
   resolveSheetSizeMm,
   scaleStrokeWidths
 } from './AcApPlotMath'
-import type { AcApPlotOptions } from './AcApPlotOptions'
+import { type AcApPlotOptions, DEFAULT_LINE_WEIGHT_MM } from './AcApPlotOptions'
 import {
   type AcApViewportComposition,
   composeSheetSvg
@@ -40,11 +40,13 @@ interface RenderPassResult {
 
 const EMPTY_BOX: ContentBox = { minX: 0, minY: 0, maxX: 0, maxY: 0 }
 
-/**
- * Width in millimeters for geometry whose lineweight resolves to neither an
- * entity nor a layer value. Matches AutoCAD's LWDEFAULT.
- */
-const DEFAULT_LINE_WEIGHT_MM = 0.25
+/** Renderer settings shared by every render pass of one plot. */
+interface RenderSettings {
+  /** Mirrors AutoCAD's "Plot transparency" checkbox. */
+  plotTransparency: boolean
+  /** Width used when no entity or layer lineweight resolves (LWDEFAULT). */
+  defaultLineWeightMm: number
+}
 
 /**
  * Minimal document source required by the plot engine. Satisfied by
@@ -144,7 +146,11 @@ export class AcApPlotConvertor {
     const printable = computePrintableArea(sheet, effectiveOptions.marginMm)
     // Opt-in: transparency decoded from DWG/DXF is unreliable and often
     // collapses entities to opacity 0, so honor it only when explicitly on.
-    const plotTransparency = effectiveOptions.plotTransparency === true
+    const render: RenderSettings = {
+      plotTransparency: effectiveOptions.plotTransparency === true,
+      defaultLineWeightMm:
+        effectiveOptions.defaultLineWeightMm ?? DEFAULT_LINE_WEIGHT_MM
+    }
 
     let contentMarkup: string | null = null
     let contentTransform: PlotTransform | null = null
@@ -165,12 +171,12 @@ export class AcApPlotConvertor {
           (this.isDefaultPaperSpaceViewport(entity) ||
             !effectiveFinal.plotViewportBorders),
         ctbTable,
-        plotTransparency
+        render
       )
 
       // One shared model-space render pass reused by every viewport.
       const modelPass = effectiveFinal.drawViewportContent
-        ? this.drawModelSpace(source, ctbTable, plotTransparency)
+        ? this.drawModelSpace(source, ctbTable, render)
         : null
 
       for (const viewport of viewports) {
@@ -206,7 +212,7 @@ export class AcApPlotConvertor {
       }
       this.mapCompositionsToSheet(compositions, contentTransform)
     } else {
-      const modelPass = this.drawModelSpace(source, ctbTable, plotTransparency)
+      const modelPass = this.drawModelSpace(source, ctbTable, render)
       const contentBox = windowBox ?? modelPass.bbox
       const factor = this.requireFactor(contentBox, printable, effectiveFinal)
       const [offsetX, offsetY] = this.resolveOffset(effectiveFinal)
@@ -263,7 +269,7 @@ export class AcApPlotConvertor {
   private configureRenderer(
     renderer: AcSvgRenderer,
     source: AcApPlotSource,
-    plotTransparency: boolean
+    render: RenderSettings
   ) {
     const db = source.doc.database
     renderer.ltscale = db.ltscale
@@ -275,7 +281,7 @@ export class AcApPlotConvertor {
     renderer.showLineWeight = true
     renderer.resolveLayerLineWeight = layerName =>
       db.tables.layerTable.getAt(layerName)?.lineWeight
-    renderer.defaultLineWeightMm = DEFAULT_LINE_WEIGHT_MM
+    renderer.defaultLineWeightMm = render.defaultLineWeightMm
     renderer.setFontMapping(AcApSettingManager.instance.fontMapping)
     // Plots always use white paper with black foreground so ACI 7
     // resolves correctly regardless of canvas theme.
@@ -283,7 +289,7 @@ export class AcApPlotConvertor {
     renderer.changeForeground(0x000000)
     // AutoCAD's "Plot transparency" defaults off; honor the option so
     // geometry can be forced fully opaque.
-    renderer.plotTransparency = plotTransparency
+    renderer.plotTransparency = render.plotTransparency
   }
 
   /**
@@ -303,9 +309,9 @@ export class AcApPlotConvertor {
   private drawModelSpace(
     source: AcApPlotSource,
     ctbTable: AcApCtbTable | null,
-    plotTransparency: boolean
+    render: RenderSettings
   ): RenderPassResult {
-    const renderer = this.createRenderer(source, ctbTable, plotTransparency)
+    const renderer = this.createRenderer(source, ctbTable, render)
     const entities =
       source.doc.database.tables.blockTable.modelSpace.newIterator()
     for (const entity of entities) {
@@ -327,12 +333,12 @@ export class AcApPlotConvertor {
     record: AcDbBlockTableRecord | undefined,
     skip: (entity: AcDbEntity) => boolean,
     ctbTable: AcApCtbTable | null,
-    plotTransparency: boolean
+    render: RenderSettings
   ): RenderPassResult {
     if (!record) {
       return { markup: '', bbox: { ...EMPTY_BOX } }
     }
-    const renderer = this.createRenderer(source, ctbTable, plotTransparency)
+    const renderer = this.createRenderer(source, ctbTable, render)
     for (const entity of record.newIterator()) {
       if (skip(entity)) continue
       renderer.drawEntity(entity)
@@ -349,12 +355,12 @@ export class AcApPlotConvertor {
   private createRenderer(
     source: AcApPlotSource,
     ctbTable: AcApCtbTable | null,
-    plotTransparency: boolean
+    render: RenderSettings
   ): AcSvgRenderer {
     const renderer = ctbTable
       ? new AcCtbSvgRenderer(ctbTable)
       : new AcSvgRenderer()
-    this.configureRenderer(renderer, source, plotTransparency)
+    this.configureRenderer(renderer, source, render)
     return renderer
   }
 
