@@ -71,10 +71,21 @@ export class AcEdMarkerManager {
    * Repositions acquired-center hint markers after pan/zoom.
    */
   public repositionHints() {
+    if (this.hintMarkers.length === 0) return
+
+    // Read the container offset once, before any marker is moved. Calling
+    // `canvasToContainer()` per marker would interleave rect reads with style
+    // writes and force a synchronous re-layout on every iteration, which turns
+    // a pan/zoom with many acquired ticks into a multi-second freeze.
+    const offset = this.view.canvasToContainerOffset()
     for (let i = 0; i < this.hintMarkers.length; i++) {
       const pos = this.hintPositions[i]
       if (!pos) continue
-      this.hintMarkers[i]!.setPosition(this.toContainerPos(pos))
+      const canvasPos = this.view.worldToScreen(pos)
+      this.hintMarkers[i]!.setPosition({
+        x: canvasPos.x + offset.x,
+        y: canvasPos.y + offset.y
+      })
     }
   }
 

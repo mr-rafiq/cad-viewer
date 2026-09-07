@@ -926,11 +926,24 @@ export abstract class AcEdBaseView {
    * return screen points in canvas space.
    */
   canvasToContainer(point: AcGePoint2dLike): AcGePoint2d {
+    const offset = this.canvasToContainerOffset()
+    return new AcGePoint2d(point.x + offset.x, point.y + offset.y)
+  }
+
+  /**
+   * Returns the canvas-to-container translation used by {@link canvasToContainer}.
+   *
+   * Reading it costs two forced layouts, so callers converting many points at
+   * once should read the offset once and apply it themselves rather than
+   * calling {@link canvasToContainer} in a loop. Interleaving those reads with
+   * DOM writes makes the browser re-layout on every iteration.
+   */
+  canvasToContainerOffset(): AcGePoint2d {
     const canvasRect = this._canvas.getBoundingClientRect()
     const containerRect = this._container.getBoundingClientRect()
     return new AcGePoint2d(
-      point.x + (canvasRect.left - containerRect.left),
-      point.y + (canvasRect.top - containerRect.top)
+      canvasRect.left - containerRect.left,
+      canvasRect.top - containerRect.top
     )
   }
 

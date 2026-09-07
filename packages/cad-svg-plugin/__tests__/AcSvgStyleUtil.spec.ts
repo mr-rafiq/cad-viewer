@@ -4,6 +4,7 @@ import {
   AcGiLineWeight,
   AcGiSubEntityTraits
 } from '@mlightcad/data-model'
+
 import { AcSvgStyleContext, AcSvgStyleUtil } from '../src/AcSvgStyleUtil'
 
 function createTraits(

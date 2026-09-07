@@ -122,6 +122,22 @@ export class AcSvgStyleUtil {
     return attrs
   }
 
+  /**
+   * Stroke attributes for hatch pattern lines.
+   *
+   * Colour, width, and opacity resolve exactly as for ordinary linework, but
+   * the entity's linetype dash pattern is dropped: a patterned hatch supplies
+   * its own `stroke-dasharray`, and the two would otherwise fight.
+   */
+  static patternStrokeAttributes(
+    traits: AcGiSubEntityTraits,
+    ctx: AcSvgStyleContext
+  ): Record<string, string> {
+    const attrs = this.strokeAttributes(traits, ctx)
+    delete attrs['stroke-dasharray']
+    return attrs
+  }
+
   static fillAttributes(
     traits: AcGiSubEntityTraits,
     ctx: AcSvgStyleContext

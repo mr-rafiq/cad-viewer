@@ -1533,6 +1533,111 @@ export class AcEdInputManager {
   }
 
   /**
+   * Watches the view canvas for a press-drag-release box gesture while the
+   * first-corner prompt of {@link getBox} is running.
+   *
+   * `getBox()` on its own is two chained point picks (click, move, click), but
+   * entity selection in the same view also accepts press-drag-release, so users
+   * reach for that gesture here too. Without this watcher the drag produces a
+   * single `click` on release, which commits only the first corner and leaves
+   * the prompt waiting — with a caller such as the Plot dialog hidden behind it,
+   * that reads as a hang.
+   *
+   * On a completed drag the pending corner prompt is cancelled synchronously
+   * from `mouseup`, which tears down its click handler before the browser
+   * dispatches the trailing `click`; the release therefore does not get consumed
+   * as a corner pick as well.
+   *
+   * @returns The captured box (`null` until a drag completes) and a `dispose()`
+   * that detaches the listeners and removes any preview rectangle
+   */
+  private watchBoxDrag(): {
+    readonly box: AcGeBox2d | null
+    dispose: () => void
+  } {
+    const state: { box: AcGeBox2d | null } = { box: null }
+    let startWcs: AcGePoint2dLike | null = null
+    let startCanvas: AcGePoint2dLike | null = null
+    let previewEl: HTMLDivElement | null = null
+
+    const clearPreview = () => {
+      previewEl?.remove()
+      previewEl = null
+    }
+
+    const canvasPos = (e: MouseEvent) =>
+      this.view.viewportToCanvas({ x: e.clientX, y: e.clientY })
+
+    const mouseDown = (e: MouseEvent) => {
+      if (e.button !== 0) return
+      // A previous drag that was released outside the canvas leaves its
+      // preview behind; drop it before starting a new one.
+      clearPreview()
+      startCanvas = canvasPos(e)
+      startWcs = this.view.screenToWorld(startCanvas)
+    }
+
+    const mouseMove = (e: MouseEvent) => {
+      if (e.buttons !== 1 || !startCanvas || !startWcs) return
+
+      const curCanvas = canvasPos(e)
+      // Only start previewing once the pointer has travelled far enough that
+      // this is a drag rather than a click that wobbled.
+      if (!previewEl) {
+        if (this.view.isSelectionClick(startCanvas, curCanvas)) return
+        previewEl = document.createElement('div')
+        previewEl.className = 'ml-jig-preview-rect'
+        this.view.container.appendChild(previewEl)
+      }
+
+      const p1 = this.view.worldToScreen(startWcs)
+      const p2 = this.view.worldToScreen(this.view.screenToWorld(curCanvas))
+      Object.assign(previewEl.style, {
+        left: `${Math.min(p1.x, p2.x)}px`,
+        top: `${Math.min(p1.y, p2.y)}px`,
+        width: `${Math.abs(p1.x - p2.x)}px`,
+        height: `${Math.abs(p1.y - p2.y)}px`
+      })
+    }
+
+    const mouseUp = (e: MouseEvent) => {
+      if (e.button !== 0) return
+
+      const start = startCanvas
+      const startPoint = startWcs
+      startCanvas = null
+      startWcs = null
+      clearPreview()
+      if (!start || !startPoint) return
+
+      const endCanvas = canvasPos(e)
+      // A plain click falls through to the normal two-corner flow.
+      if (this.view.isSelectionClick(start, endCanvas)) return
+
+      state.box = new AcGeBox2d()
+        .expandByPoint(startPoint)
+        .expandByPoint(this.view.screenToWorld(endCanvas))
+      this.cancelActiveInput()
+    }
+
+    this.view.canvas.addEventListener('mousedown', mouseDown)
+    this.view.canvas.addEventListener('mousemove', mouseMove)
+    this.view.canvas.addEventListener('mouseup', mouseUp)
+
+    return {
+      get box() {
+        return state.box
+      },
+      dispose: () => {
+        clearPreview()
+        this.view.canvas.removeEventListener('mousedown', mouseDown)
+        this.view.canvas.removeEventListener('mousemove', mouseMove)
+        this.view.canvas.removeEventListener('mouseup', mouseUp)
+      }
+    }
+  }
+
+  /**
    * Prompt the user to specify a rectangular box by selecting two corners.
    * Each corner may be specified by clicking on the canvas or typing "x,y".
    * A live HTML overlay rectangle previews the box as the user moves the mouse.
@@ -1540,6 +1645,9 @@ export class AcEdInputManager {
    * The box prompt is implemented as two chained point prompts. Keywords from
    * the original box prompt are copied into each corner prompt so the caller
    * sees a consistent interaction model across both stages.
+   *
+   * Press-drag-release is accepted as well, matching the window gesture used by
+   * entity selection; see {@link watchBoxDrag}.
    *
    * @param options - Box prompt options controlling corner messages, preview behavior, and keywords
    * @returns A prompt result containing the final 2D box, cancel status, or keyword
@@ -1557,7 +1665,19 @@ export class AcEdInputManager {
         options1.useBasePoint = options.useBasePoint
         options1.disableOSnap = options.disableOSnap
         options1.allowNone = options.allowNone
-        const p1Result = await this.getPoint(options1)
+
+        // The first corner may also come from a press-drag-release gesture,
+        // which yields the whole box at once and cancels this corner prompt.
+        const drag = this.watchBoxDrag()
+        let p1Result: AcEdPromptPointResult
+        try {
+          p1Result = await this.getPoint(options1)
+        } finally {
+          drag.dispose()
+        }
+        if (drag.box) {
+          return new AcEdPromptBoxResult(AcEdPromptStatus.OK, drag.box)
+        }
         if (p1Result.status !== AcEdPromptStatus.OK) {
           return new AcEdPromptBoxResult(
             p1Result.status,

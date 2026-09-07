@@ -1,7 +1,7 @@
 import { FontManager } from '@mlightcad/mtext-renderer'
 
-import { AcSvgShape } from '../src/AcSvgShape'
 import { AcSvgRenderer } from '../src/AcSvgRenderer'
+import { AcSvgShape } from '../src/AcSvgShape'
 import {
   buildSvgShape,
   computeBaselineLeftAnchor,
