@@ -33,7 +33,7 @@ export class AcTrProgressiveOpenFitController {
   private initialPendingCount = 0
   private convertedCount = 0
   private lastFittedBox?: AcGeBox2d
-  private lastZoomAt = 0
+  private lastFitCheckAt = 0
 
   constructor(private readonly zoomTo: AcTrProgressiveOpenFitZoomFn) {}
 
@@ -60,7 +60,7 @@ export class AcTrProgressiveOpenFitController {
 
     this.active = true
     this.userAdjusted = false
-    this.lastZoomAt = 0
+    this.lastFitCheckAt = 0
     this.initialPendingCount = pendingEntityCount
     this.convertedCount = 0
     this.lastFittedBox = undefined
@@ -141,18 +141,21 @@ export class AcTrProgressiveOpenFitController {
 
     const now = performance.now()
     if (
-      now - this.lastZoomAt <
+      now - this.lastFitCheckAt <
       AcTrProgressiveOpenFitController.FIT_INTERVAL_MS
     ) {
       return
     }
 
+    // Throttle the expensive bounds scan even if the drawing has not grown
+    // enough to move the camera. Otherwise every subsequent entity rescans
+    // all batched geometry after the first interval with no zoom.
+    this.lastFitCheckAt = now
     const box = resolveFitBox()
     if (!box || !this.shouldApplyIncrementalFit(box)) {
       return
     }
 
-    this.lastZoomAt = now
     this.applyZoom(box)
   }
 
