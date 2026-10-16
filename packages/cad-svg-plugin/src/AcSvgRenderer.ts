@@ -192,6 +192,9 @@ export class AcSvgRenderer implements AcGiRenderer<AcSvgEntity> {
     this._defaultLineWeightMm = value
   }
 
+  /** Exact width in millimeters supplied by a plot style, scoped by its renderer. */
+  lineWeightOverrideMm?: number
+
   private get styleContext(): AcSvgStyleContext {
     return {
       ltscale: this._ltscale,
@@ -201,7 +204,8 @@ export class AcSvgRenderer implements AcGiRenderer<AcSvgEntity> {
       showLineWeight: this._showLineWeight,
       plotTransparency: this._plotTransparency,
       resolveLayerLineWeight: this._resolveLayerLineWeight,
-      defaultLineWeightMm: this._defaultLineWeightMm
+      defaultLineWeightMm: this._defaultLineWeightMm,
+      lineWeightOverrideMm: this.lineWeightOverrideMm
     }
   }
 

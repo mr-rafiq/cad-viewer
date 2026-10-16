@@ -52,6 +52,19 @@ function plotRenderer() {
 }
 
 describe('CTB plotted lineweights', () => {
+  it.each([0.1, 0.37, 0.025])('prints an exact custom CTB width of %s mm without rounding to an enum', (width) => {
+    const table = createBuiltinCtb()
+    table.getStyle(1)!.lineweightMm = width
+    const renderer = new AcCtbSvgRenderer(table)
+    renderer.showLineWeight = true
+    renderer.subEntityTraits.color = aciColor(1)
+    expect(renderer.lines(points).svg).toContain(`stroke-width="${width}"`)
+    expect(renderer.lineWeightOverrideMm).toBeUndefined()
+    renderer.subEntityTraits.color = aciColor(2)
+    renderer.subEntityTraits.lineWeight = AcGiLineWeight.LineWeight050
+    expect(renderer.lines(points).svg).toContain('stroke-width="0.5"')
+  })
+
   it('preserves different pen widths through rendering and sheet scaling', () => {
     const renderer = plotRenderer()
     renderer.subEntityTraits.color = aciColor(1)

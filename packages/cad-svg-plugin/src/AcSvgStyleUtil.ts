@@ -33,6 +33,8 @@ export interface AcSvgStyleContext {
    * screen exports, where an unresolved lineweight emits no width.
    */
   defaultLineWeightMm?: number
+  /** Physical plot-style width; unlike entity enums, CTB widths are arbitrary. */
+  lineWeightOverrideMm?: number
 }
 
 export type AcSvgPrimitiveKind = 'line' | 'fill' | 'text' | 'point'
@@ -225,6 +227,10 @@ export class AcSvgStyleUtil {
     traits: AcGiSubEntityTraits,
     ctx: AcSvgStyleContext
   ): number | null {
+    const plotWidth = ctx.lineWeightOverrideMm
+    if (plotWidth != null && Number.isFinite(plotWidth) && plotWidth >= 0) {
+      return plotWidth === 0 ? MIN_STROKE_WIDTH_MM : plotWidth
+    }
     // AutoCAD lineweights are in hundredths of a millimeter.
     if (LINE_WEIGHT_STEPS.has(traits.lineWeight)) {
       return Math.max(MIN_STROKE_WIDTH_MM, traits.lineWeight / 100)

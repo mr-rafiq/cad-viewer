@@ -5,7 +5,6 @@ import type {
   AcGeEllipseArc3d,
   AcGePoint3d,
   AcGePoint3dLike,
-  AcGiLineWeight,
   AcGiMTextData,
   AcGiPointStyle,
   AcGiShapeData,
@@ -20,15 +19,6 @@ import {
   applyScreening,
   toGrayscale
 } from './AcApCtb'
-
-/**
- * Standard AutoCAD lineweights in hundredths of a millimeter, mirroring
- * {@link AcGiLineWeight}. CTB lineweights are snapped to the nearest entry.
- */
-const LINEWEIGHT_STEPS = [
-  0, 5, 9, 13, 15, 18, 20, 25, 30, 35, 40, 45, 50, 53, 60, 65, 70, 80, 90, 100,
-  106, 120, 140, 158, 200, 211
-]
 
 /**
  * An {@link AcSvgRenderer} that applies a CTB plot style table at draw
@@ -53,12 +43,14 @@ export class AcCtbSvgRenderer extends AcSvgRenderer {
     const traits = this.subEntityTraits
     const color = traits.color
     const lineWeight = traits.lineWeight
+    const plotWidth = this.lineWeightOverrideMm
     try {
       this.applyCtbToTraits()
       return draw()
     } finally {
       traits.color = color
       traits.lineWeight = lineWeight
+      this.lineWeightOverrideMm = plotWidth
     }
   }
 
@@ -167,9 +159,8 @@ export class AcCtbSvgRenderer extends AcSvgRenderer {
   }
 
   /**
-   * Overrides the trait lineweight with the CTB lineweight (in hundredths
-   * of a millimeter, snapped to the nearest standard value). Only applied
-   * when lineweight display is enabled, mirroring LWDISPLAY behavior.
+   * Supplies the exact CTB width in millimeters. Converting to an entity
+   * enum loses custom widths such as 0.10 mm or 0.37 mm.
    */
   private applyEntryLineweight(
     traits: AcGiSubEntityTraits,
@@ -178,11 +169,7 @@ export class AcCtbSvgRenderer extends AcSvgRenderer {
     if (entry.lineweightMm == null || !this.showLineWeight) {
       return
     }
-    const hundredths = entry.lineweightMm * 100
-    const snapped = LINEWEIGHT_STEPS.reduce((best, step) =>
-      Math.abs(step - hundredths) < Math.abs(best - hundredths) ? step : best
-    )
-    traits.lineWeight = snapped as AcGiLineWeight
+    this.lineWeightOverrideMm = entry.lineweightMm
   }
 
   /**
