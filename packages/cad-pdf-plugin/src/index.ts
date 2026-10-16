@@ -22,6 +22,7 @@ export {
   computePrintableArea,
   computeScaleFactor,
   resolveSheetSizeMm,
+  scaleStrokeWidths,
   type ContentBox,
   type PlotRect,
   type PlotTransform

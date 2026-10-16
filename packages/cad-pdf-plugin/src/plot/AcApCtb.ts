@@ -118,6 +118,7 @@ export function parseCtbText(text: string): AcApCtbTable {
   }
 
   let index = 0
+  let styleBlock: CtbBlock | undefined
   const isBlockStart = (line: string) => line.trimEnd().endsWith('{')
   const nameOf = (line: string) =>
     line.endsWith('{') ? line.slice(0, -1).trim() : line.split('=', 1)[0].trim()
@@ -153,12 +154,20 @@ export function parseCtbText(text: string): AcApCtbTable {
     if (isBlockStart(line)) {
       const block = parseBlock()
       if (name === 'custom_lineweight_table') {
-        table.lineweights = Object.entries(block)
-          .map(([key, value]) => [Number(key), Number(value)] as const)
-          .sort((a, b) => a[0] - b[0])
-          .map(([, value]) => value)
+        table.lineweights = Object.entries(block).reduce<number[]>(
+          (weights, [key, value]) => {
+            weights[Number(key)] = Number(value)
+            return weights
+          },
+          []
+        )
       } else if (name === 'aci_table' || name === 'plot_style') {
-        table.styles = parseStyleEntries(block, table.lineweights)
+        // Real CTBs put plot_style before custom_lineweight_table. Resolve
+        // indices only after the whole file is read. aci_table may contain
+        // scalar color names rather than style records.
+        if (Object.values(block).some(value => typeof value !== 'string')) {
+          styleBlock = block
+        }
       }
     } else {
       if (name === 'description') {
@@ -169,6 +178,9 @@ export function parseCtbText(text: string): AcApCtbTable {
     }
   }
 
+  if (styleBlock) {
+    table.styles = parseStyleEntries(styleBlock, table.lineweights)
+  }
   return table
 }
 

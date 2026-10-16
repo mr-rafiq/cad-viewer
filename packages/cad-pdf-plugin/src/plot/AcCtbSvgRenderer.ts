@@ -48,6 +48,20 @@ export class AcCtbSvgRenderer extends AcSvgRenderer {
     this.ctb = ctb
   }
 
+  /** Keep source ACI and object width intact between primitive calls. */
+  private withCtbTraits<T>(draw: () => T): T {
+    const traits = this.subEntityTraits
+    const color = traits.color
+    const lineWeight = traits.lineWeight
+    try {
+      this.applyCtbToTraits()
+      return draw()
+    } finally {
+      traits.color = color
+      traits.lineWeight = lineWeight
+    }
+  }
+
   /**
    * Applies the CTB entry for the current trait color to the traits
    * object, right before a primitive is emitted.
@@ -175,8 +189,7 @@ export class AcCtbSvgRenderer extends AcSvgRenderer {
    * @inheritdoc
    */
   override lines(points: AcGePoint3dLike[]) {
-    this.applyCtbToTraits()
-    return super.lines(points)
+    return this.withCtbTraits(() => super.lines(points))
   }
 
   /**
@@ -187,55 +200,50 @@ export class AcCtbSvgRenderer extends AcSvgRenderer {
     itemSize: number,
     indices: Uint16Array
   ) {
-    this.applyCtbToTraits()
-    return super.lineSegments(array, itemSize, indices)
+    return this.withCtbTraits(() =>
+      super.lineSegments(array, itemSize, indices)
+    )
   }
 
   /**
    * @inheritdoc
    */
   override circularArc(arc: AcGeCircArc3d) {
-    this.applyCtbToTraits()
-    return super.circularArc(arc)
+    return this.withCtbTraits(() => super.circularArc(arc))
   }
 
   /**
    * @inheritdoc
    */
   override ellipticalArc(ellipseArc: AcGeEllipseArc3d) {
-    this.applyCtbToTraits()
-    return super.ellipticalArc(ellipseArc)
+    return this.withCtbTraits(() => super.ellipticalArc(ellipseArc))
   }
 
   /**
    * @inheritdoc
    */
   override area(area: AcGeArea2d) {
-    this.applyCtbToTraits()
-    return super.area(area)
+    return this.withCtbTraits(() => super.area(area))
   }
 
   /**
    * @inheritdoc
    */
   override point(point: AcGePoint3d, style: AcGiPointStyle) {
-    this.applyCtbToTraits()
-    return super.point(point, style)
+    return this.withCtbTraits(() => super.point(point, style))
   }
 
   /**
    * @inheritdoc
    */
   override mtext(mtext: AcGiMTextData, style: AcGiTextStyle, delay?: boolean) {
-    this.applyCtbToTraits()
-    return super.mtext(mtext, style, delay)
+    return this.withCtbTraits(() => super.mtext(mtext, style, delay))
   }
 
   /**
    * @inheritdoc
    */
   override shape(shape: AcGiShapeData, style: AcGiTextStyle, delay?: boolean) {
-    this.applyCtbToTraits()
-    return super.shape(shape, style, delay)
+    return this.withCtbTraits(() => super.shape(shape, style, delay))
   }
 }

@@ -67,6 +67,45 @@ describe('parseCtbText color decoding', () => {
   })
 })
 
+describe('parseCtbText pen widths', () => {
+  it.each(['aci_table', 'plot_style'])(
+    'resolves %s widths when the lineweight table follows the styles',
+    section => {
+      const table = parseCtbText(
+        [
+          `${section}{`,
+          ' 0{',
+          '  lineweight=5',
+          ' }',
+          ' 1{',
+          '  lineweight=8',
+          ' }',
+          ' 2{',
+          '  lineweight=0',
+          ' }',
+          '}',
+          'custom_lineweight_table{',
+          ' 8=0.50',
+          ' 0=0.0',
+          ' 5=0.15',
+          '}'
+        ].join('\n')
+      )
+
+      expect(table.getStyle(1)!.lineweightMm).toBe(0.15)
+      expect(table.getStyle(2)!.lineweightMm).toBe(0.5)
+      expect(table.getStyle(3)!.lineweightMm).toBeNull()
+    }
+  )
+
+  it('does not overwrite styles with the scalar ACI name table', () => {
+    const table = parseCtbText(
+      [ctbBody(['lineweight=5']), 'aci_table{', ' 0="Color_1', '}'].join('\n')
+    )
+    expect(table.getStyle(1)!.lineweightMm).toBe(0.15)
+  })
+})
+
 describe('createBuiltinCtb', () => {
   it('plots every ACI black at full ink', () => {
     const table = createBuiltinCtb(false)
