@@ -66,7 +66,7 @@ export class AcCtbSvgRenderer extends AcSvgRenderer {
       return
     }
     this.applyEntryColor(traits, entry, aci)
-    this.applyEntryLineweight(traits, entry)
+    this.applyEntryLineweight(entry)
   }
 
   /**
@@ -163,7 +163,6 @@ export class AcCtbSvgRenderer extends AcSvgRenderer {
    * enum loses custom widths such as 0.10 mm or 0.37 mm.
    */
   private applyEntryLineweight(
-    traits: AcGiSubEntityTraits,
     entry: AcApCtbEntry
   ): void {
     if (entry.lineweightMm == null || !this.showLineWeight) {
