@@ -73,6 +73,11 @@ export class AcSvgEntity implements AcGiEntity {
     return this._localSvg
   }
 
+  /** Child graphics, for export styling that preserves entity boundaries. */
+  get children(): readonly AcSvgEntity[] {
+    return this._children
+  }
+
   /**
    * Final SVG fragment with accumulated transforms applied.
    */

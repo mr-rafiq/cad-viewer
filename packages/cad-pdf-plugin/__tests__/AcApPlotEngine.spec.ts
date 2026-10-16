@@ -52,6 +52,16 @@ describe('computeScaleFactor', () => {
 })
 
 describe('computeContentTransform', () => {
+  it('keeps a high-coordinate border on the clip edge after SVG serialization', () => {
+    const bounds = { minX: 164000.123456, minY: -5000, maxX: 164702.781002, maxY: -4000 };
+    const area = { x: 8, y: 8, width: 281, height: 404 };
+    const factor = computeScaleFactor(bounds, area, { scaleMode: 'fit', scaleNumerator: 1, scaleDenominator: 1 })!;
+    const transform = computeContentTransform(bounds, factor, area, true);
+    const serialized = toMatrixAttribute(transform).slice(7, -1).split(',').map(Number);
+    expect(serialized[0]).toBe(transform.a);
+    expect(serialized[0]! * bounds.minX + serialized[4]!).toBeCloseTo(area.x, 8);
+  });
+
   const printable = { x: 5, y: 5, width: 200, height: 100 }
 
   it('centers content inside the printable area with Y flip', () => {

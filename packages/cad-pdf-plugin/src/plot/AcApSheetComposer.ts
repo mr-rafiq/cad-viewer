@@ -84,9 +84,9 @@ function sanitizeExternalReferences(markup: string): string {
  * Builds the matrix attribute string for a {@link PlotTransform}.
  */
 export function toMatrixAttribute(transform: PlotTransform): string {
-  return `matrix(${fmt(transform.a)},${fmt(transform.b)},${fmt(
-    transform.c
-  )},${fmt(transform.d)},${fmt(transform.e)},${fmt(transform.f)})`
+  // Six decimal places in the scale can move large DWG coordinates outside
+  // an otherwise exact clip window, removing thin lines along its edges.
+  return `matrix(${[transform.a, transform.b, transform.c, transform.d, transform.e, transform.f].map(value => Number.isFinite(value) ? String(value) : '0').join(',')})`
 }
 
 /**

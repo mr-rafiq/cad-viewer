@@ -16,6 +16,13 @@ const ctx: AcSvgStyleContext = {
 const defaultTraits = () => new AcSvgRenderer().subEntityTraits
 
 describe('AcSvgEntity transforms', () => {
+  it('exposes child entity boundaries for selective export styling', () => {
+    const line = new AcSvgLine([{ x: 0, y: 0, z: 0 }, { x: 10, y: 0, z: 0 }], defaultTraits(), ctx);
+    const group = new AcSvgGroup([line]);
+    expect(group.children).toEqual([line]);
+    expect(group.fastDeepClone().children[0]).not.toBe(line);
+  });
+
   it('wraps geometry with applyMatrix transform at export time', () => {
     const line = new AcSvgLine(
       [
